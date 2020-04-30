@@ -75,6 +75,7 @@ func (c *Connection) collyHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		zl.Debug().Err(err).
 			Msg("failed to serialize response")
+		w.WriteHeader(500)
 		return
 	}
 	w.Header().Add("Content-Type", "application/json")
@@ -82,6 +83,7 @@ func (c *Connection) collyHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		zl.Debug().Err(err).
 			Msgf("failed to write : %v ", statusCode)
+		w.WriteHeader(500)
 		return
 	}
 	zl.Debug().
@@ -103,6 +105,7 @@ func (c *Connection) goQueryHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		zl.Debug().Err(err).
 			Msg("failed to serialize response")
+		w.WriteHeader(500)
 		return
 	}
 	w.Header().Add("Content-Type", "application/json")
@@ -110,6 +113,7 @@ func (c *Connection) goQueryHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		zl.Debug().Err(err).
 			Msgf("failed to write : %v ", statusCode)
+		w.WriteHeader(500)
 		return
 	}
 	zl.Debug().
