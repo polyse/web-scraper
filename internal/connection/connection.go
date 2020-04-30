@@ -73,14 +73,16 @@ func (c *Connection) collyHandler(w http.ResponseWriter, r *http.Request) {
 	// dump results
 	b, err := json.Marshal(c.SitesInfo)
 	if err != nil {
-		zl.Fatal().Err(err).
+		zl.Debug().Err(err).
 			Msg("failed to serialize response")
+		return
 	}
 	w.Header().Add("Content-Type", "application/json")
 	statusCode, err := w.Write(b)
 	if err != nil {
-		zl.Fatal().Err(err).
+		zl.Debug().Err(err).
 			Msgf("failed to write : %v ", statusCode)
+		return
 	}
 	zl.Debug().
 		Msg("Send data!")
@@ -99,14 +101,16 @@ func (c *Connection) goQueryHandler(w http.ResponseWriter, r *http.Request) {
 	// dump results
 	b, err := json.Marshal(c.SitesInfo)
 	if err != nil {
-		zl.Fatal().Err(err).
+		zl.Debug().Err(err).
 			Msg("failed to serialize response")
+		return
 	}
 	w.Header().Add("Content-Type", "application/json")
 	statusCode, err := w.Write(b)
 	if err != nil {
-		zl.Fatal().Err(err).
+		zl.Debug().Err(err).
 			Msgf("failed to write : %v ", statusCode)
+		return
 	}
 	zl.Debug().
 		Msg("Send data!")
@@ -115,7 +119,8 @@ func (c *Connection) goQueryHandler(w http.ResponseWriter, r *http.Request) {
 func (c *Connection) collyScrapper(URL string) {
 	submatchall := RegExp.FindAllString(URL, -1)
 	correctURL := strings.Join(submatchall, "")
-	zl.Debug().Msgf("Got correct URL: %v ", correctURL)
+	zl.Debug().
+		Msgf("Got correct URL: %v ", correctURL)
 	// Instantiate default collector
 	co := colly.NewCollector(
 		colly.AllowedDomains(correctURL, "m."+correctURL, "www."+correctURL),
@@ -198,7 +203,8 @@ func (c *Connection) goQuery(domen, URL string, depthLevel int) {
 	// Request the HTML page.
 	res, err := http.Get(URL)
 	if err != nil {
-		zl.Debug().Err(err).Msgf("Can't get url %v", URL)
+		zl.Debug().Err(err).
+			Msgf("Can't get url %v", URL)
 		return
 	}
 	defer res.Body.Close()
