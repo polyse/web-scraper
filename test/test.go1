@@ -1,0 +1,35 @@
+package main
+
+import (
+	"bytes"
+	"github.com/gocolly/colly/v2"
+	"github.com/gocolly/colly/v2/proxy"
+	"log"
+)
+
+func main() {
+	// Instantiate default collector
+	c := colly.NewCollector(colly.AllowURLRevisit())
+
+	// On every a element which has href attribute call callback
+	c.OnHTML("pre", func(e *colly.HTMLElement) {
+		log.Print(e.Text)
+	})
+	// Rotate two socks5 proxies
+	rp, err := proxy.RoundRobinProxySwitcher("https://209.45.53.53:3128",
+		"https://188.170.233.100:3128")
+	if err != nil {
+		log.Fatal(err)
+	}
+	c.SetProxyFunc(rp)
+
+	// Print the response
+	c.OnResponse(func(r *colly.Response) {
+		log.Printf("%s\n", bytes.Replace(r.Body, []byte("\n"), nil, -1))
+	})
+
+	// Fetch httpbin.org/ip five times
+	for i := 0; i < 5; i++ {
+		c.Visit("https://httpbin.org/ip")
+	}
+}

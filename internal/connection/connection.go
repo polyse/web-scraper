@@ -132,6 +132,7 @@ func (c *Connection) collyScrapper(URL string) {
 		// and links on those pages are visited
 		colly.MaxDepth(2),
 		colly.Async(true),
+		colly.UserAgent("Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"),
 	)
 
 	// Limit the maximum parallelism to 2
@@ -180,6 +181,7 @@ func (c *Connection) listener(domen string) {
 		} else {
 			c.SitesInfo[domen][newElem[0]] = append(c.SitesInfo[domen][newElem[0]], newElem[1])
 		}
+		zl.Debug().Msgf("Add")
 	}
 }
 
@@ -247,11 +249,13 @@ func (c *Connection) goQuery(domen, URL string, depthLevel int) {
 	// Find the review items
 	doc.Find("a").Each(func(_ int, s *goquery.Selection) {
 		link, _ := s.Attr("href")
+		zl.Debug().
+			Msgf("Find : %v", link)
 		if strings.Contains(link, "http") == false {
 			link = "https://" + domen + link
 		}
-		//zl.Debug().
-		//	Msgf("Find : %v", link)
+		zl.Debug().
+			Msgf("Find : %v", link)
 		go c.goQuery(domen, link, depthLevel-1)
 	})
 	zl.Debug().
