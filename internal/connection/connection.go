@@ -73,17 +73,17 @@ func (c *Connection) collyHandler(w http.ResponseWriter, r *http.Request) {
 	// dump results
 	b, err := json.Marshal(c.SitesInfo)
 	if err != nil {
-		zl.Debug().Err(err).
+		zl.Warn().Err(err).
 			Msg("failed to serialize response")
-		w.WriteHeader(500)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Add("Content-Type", "application/json")
 	statusCode, err := w.Write(b)
 	if err != nil {
-		zl.Debug().Err(err).
+		zl.Warn().Err(err).
 			Msgf("failed to write : %v ", statusCode)
-		w.WriteHeader(500)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	zl.Debug().
@@ -103,17 +103,17 @@ func (c *Connection) goQueryHandler(w http.ResponseWriter, r *http.Request) {
 	// dump results
 	b, err := json.Marshal(c.SitesInfo)
 	if err != nil {
-		zl.Debug().Err(err).
+		zl.Warn().Err(err).
 			Msg("failed to serialize response")
-		w.WriteHeader(500)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Add("Content-Type", "application/json")
 	statusCode, err := w.Write(b)
 	if err != nil {
-		zl.Debug().Err(err).
+		zl.Warn().Err(err).
 			Msgf("failed to write : %v ", statusCode)
-		w.WriteHeader(500)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	zl.Debug().
