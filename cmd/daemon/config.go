@@ -7,7 +7,7 @@ import (
 type config struct {
 	Listen     string `env:"LISTEN" envDefault:"localhost:7171"`
 	LogLevel   string `env:"LOGLEVEL" envDefault:"debug"`
-	FilePath   string `env:"FILEPATH" envDefault:"C:\\Users\\kudin\\Documents\\Курсы\\polyse\\web-scraper\\cmd\\daemon\\in.txt"`
+	FilePath   string `env:"FILEPATH" envDefault:"in.txt"`
 	OutputPath string `env:"OUTPATH" envDefault:"out.json"`
 }
 
