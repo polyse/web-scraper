@@ -9,6 +9,9 @@ import (
 	"github.com/polyse/web-scraper/internal/app"
 	"github.com/polyse/web-scraper/internal/connection"
 	"github.com/polyse/web-scraper/internal/module"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"os"
 )
 
 // Injectors from wire.go:
@@ -18,16 +21,15 @@ func initApp() (*app.App, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	connection, cleanup, err := initConnection(mainConfig)
+	module, err := initModule(mainConfig)
 	if err != nil {
 		return nil, nil, err
 	}
-	module, err := initModule(mainConfig, connection)
+	connection, cleanup, err := initConnection(mainConfig, module)
 	if err != nil {
-		cleanup()
 		return nil, nil, err
 	}
-	appApp, err := app.NewApp(module)
+	appApp, err := app.NewApp(connection)
 	if err != nil {
 		cleanup()
 		return nil, nil, err
@@ -39,12 +41,19 @@ func initApp() (*app.App, func(), error) {
 
 // wire.go:
 
-func initModule(cfg *config, conn *connection.Connection) (*module.Module, error) {
-	return module.NewModule(cfg.FilePath, cfg.OutputPath, conn)
+func initModule(cfg *config) (*module.Module, error) {
+	logLevel, err := zerolog.ParseLevel(cfg.LogLevel)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("Can't parse loglevel")
+	}
+	zerolog.SetGlobalLevel(logLevel)
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
+	return module.NewModule(cfg.FilePath, cfg.OutputPath)
 }
 
-func initConnection(cfg *config) (*connection.Connection, func(), error) {
-	c, err := connection.New(cfg.Listen)
+func initConnection(cfg *config, mod *module.Module) (*connection.Connection, func(), error) {
+	c, err := connection.New(cfg.Listen, mod)
 	return c, func() {
 		c.Close()
 	}, err

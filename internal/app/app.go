@@ -1,19 +1,19 @@
 package app
 
 import (
-	"github.com/polyse/web-scraper/internal/module"
+	"github.com/polyse/web-scraper/internal/connection"
 )
 
 type App struct {
-	mod *module.Module
+	con *connection.Connection
 }
 
-func NewApp(mod *module.Module) (*App, error) {
+func NewApp(con *connection.Connection) (*App, error) {
 	return &App{
-		mod: mod,
+		con: con,
 	}, nil
 }
 
 func (a *App) Action() {
-	a.mod.Conn.Start()
+	a.con.Start()
 }
