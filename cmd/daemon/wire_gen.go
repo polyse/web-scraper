@@ -49,7 +49,7 @@ func initModule(cfg *config) (*module.Module, error) {
 	zerolog.SetGlobalLevel(logLevel)
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-	return module.NewModule(cfg.FilePath, cfg.OutputPath)
+	return module.NewModule(cfg.OutputPath)
 }
 
 func initConnection(cfg *config, mod *module.Module) (*connection.Connection, func(), error) {

@@ -6,9 +6,8 @@ import (
 
 type config struct {
 	Listen     string `env:"LISTEN" envDefault:"localhost:7171"`
-	LogLevel   string `env:"LOGLEVEL" envDefault:"debug"`
-	FilePath   string `env:"FILEPATH" envDefault:"in.txt"`
-	OutputPath string `env:"OUTPATH" envDefault:"out.json"`
+	LogLevel   string `env:"LOG_LEVEL" envDefault:"debug"`
+	OutputPath string `env:"OUT_PATH" envDefault:"out.json"`
 }
 
 func newConfig() (*config, error) {
