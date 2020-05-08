@@ -15,7 +15,11 @@ func TestExtractor_ExtractContentFromHTML(t *testing.T) {
 		"<style>font-style:normal</style></body></html>"
 	expected := " And another one content block. Some bold text. short content More content. " +
 		"Text with link in it: some link     "
-	actual := ExtractContentFromHTML(htmlString)
+	actual, err := ExtractContentFromHTML(htmlString)
+	if err != nil {
+		t.Errorf("\nunexpected error: %v", err)
+	}
+	actual = Clean(actual)
 	if actual != expected {
 		t.Errorf("\nactual:   %v \nexpected: %v", actual, expected)
 	}
