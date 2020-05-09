@@ -5,12 +5,12 @@ import (
 )
 
 func main() {
-	app, cleanup, err := initApp()
+	api, cleanup, err := initApp()
 
 	if err != nil {
 		zl.Fatal().Err(err).
-			Msg("Can't init app")
+			Msg("Can't init api")
 	}
 	defer cleanup()
-	app.Action()
+	api.Start()
 }

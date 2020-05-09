@@ -6,9 +6,8 @@
 package main
 
 import (
-	"github.com/polyse/web-scraper/internal/app"
-	"github.com/polyse/web-scraper/internal/connection"
-	"github.com/polyse/web-scraper/internal/module"
+	"github.com/polyse/web-scraper/internal/api"
+	"github.com/polyse/web-scraper/internal/spider"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"os"
@@ -16,32 +15,27 @@ import (
 
 // Injectors from wire.go:
 
-func initApp() (*app.App, func(), error) {
+func initApp() (*api.API, func(), error) {
 	mainConfig, err := newConfig()
 	if err != nil {
 		return nil, nil, err
 	}
-	module, err := initModule(mainConfig)
+	spider, err := initSpider(mainConfig)
 	if err != nil {
 		return nil, nil, err
 	}
-	connection, cleanup, err := initConnection(mainConfig, module)
+	apiAPI, cleanup, err := initApi(mainConfig, spider)
 	if err != nil {
 		return nil, nil, err
 	}
-	appApp, err := app.NewApp(connection)
-	if err != nil {
-		cleanup()
-		return nil, nil, err
-	}
-	return appApp, func() {
+	return apiAPI, func() {
 		cleanup()
 	}, nil
 }
 
 // wire.go:
 
-func initModule(cfg *config) (*module.Module, error) {
+func initSpider(cfg *config) (*spider.Spider, error) {
 	logLevel, err := zerolog.ParseLevel(cfg.LogLevel)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("Can't parse loglevel")
@@ -49,11 +43,11 @@ func initModule(cfg *config) (*module.Module, error) {
 	zerolog.SetGlobalLevel(logLevel)
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-	return module.NewModule(cfg.OutputPath)
+	return spider.NewSpider()
 }
 
-func initConnection(cfg *config, mod *module.Module) (*connection.Connection, func(), error) {
-	c, err := connection.New(cfg.Listen, mod)
+func initApi(cfg *config, mod *spider.Spider) (*api.API, func(), error) {
+	c, err := api.New(cfg.Listen, mod)
 	return c, func() {
 		c.Close()
 	}, err
