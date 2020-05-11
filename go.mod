@@ -12,4 +12,5 @@ require (
 	github.com/mauidude/go-readability v0.0.0-20141216012317-2f30b1a346f1
 	github.com/rs/zerolog v1.18.0
 	go.zoe.im/surferua v0.0.1
+	golang.org/x/net v0.0.0-20200506145744-7e3656a0809f // indirect
 )
