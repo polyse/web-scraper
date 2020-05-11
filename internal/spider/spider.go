@@ -1,37 +1,33 @@
-package module
+package spider
 
 import (
-	"encoding/json"
-	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-
 	"github.com/bobesa/go-domain-util/domainutil"
 	"github.com/gocolly/colly/v2"
+	"github.com/mauidude/go-readability"
 	zl "github.com/rs/zerolog/log"
 	"go.zoe.im/surferua"
 )
 
-type Module struct {
-	outPath       string
+type Spider struct {
 	DataCh        chan SitesInfo
 	mutex         *sync.Mutex
 	currentDomain string
-	info          []SitesInfo `json:"info"`
+	info          []SitesInfo
 }
 
 type SitesInfo struct {
-	Title   string `json:"Title"`
-	URL     string `json:"URL"`
-	Payload string `json:"Payload"`
+	Title   string
+	URL     string
+	Payload string
 }
 
-func NewModule(outPath string) (*Module, error) {
-	m := &Module{
-		outPath:       outPath,
+func NewSpider() (*Spider, error) {
+	m := &Spider{
 		DataCh:        make(chan SitesInfo),
 		mutex:         &sync.Mutex{},
 		currentDomain: "",
@@ -40,22 +36,7 @@ func NewModule(outPath string) (*Module, error) {
 	return m, nil
 }
 
-func (m *Module) WriteResult() {
-	file, _ := os.OpenFile(m.outPath, os.O_CREATE, os.ModePerm)
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	err := encoder.Encode(m.info)
-
-	if err != nil {
-		zl.Warn().Err(err).
-			Msg("Can't write json in file")
-	}
-	zl.Debug().
-		Msg("Write data")
-}
-
-func (m *Module) Colly(domain string) {
+func (m *Spider) Colly(domain string) {
 	m.currentDomain = domainutil.Domain(domain)
 	go m.Listener()
 	m.collyScrapper(domain)
@@ -65,10 +46,11 @@ func (m *Module) Colly(domain string) {
 		Msgf("Finish %v and start new", domain)
 	m.DataCh = make(chan SitesInfo)
 	m.mutex.Unlock()
-	m.WriteResult()
+	zl.Debug().
+		Msgf("%v", m.info)
 }
 
-func (m *Module) collyScrapper(URL string) {
+func (m *Spider) collyScrapper(URL string) {
 	zl.Debug().Msgf("%v", m.currentDomain)
 	co := colly.NewCollector(
 		colly.AllowedDomains(m.currentDomain),
@@ -81,10 +63,8 @@ func (m *Module) collyScrapper(URL string) {
 		RandomDelay: 1 * time.Second,
 	})
 
-	// On every a element which has href attribute call callback
 	co.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		link := e.Attr("href")
-		// Visit link found on page on a new thread
 		fullLink := e.Request.AbsoluteURL(link)
 		zl.Debug().Msgf("Find URL : %v", fullLink)
 		e.Request.Visit(fullLink)
@@ -99,29 +79,25 @@ func (m *Module) collyScrapper(URL string) {
 			return
 		}
 		title := doc.Find("Title").Text()
-		/*doc, err := readability.NewDocument(Payload)
+		d, err := readability.NewDocument(payload)
 		if err != nil {
 			zl.Debug().Err(err).
 				Msg("Can't load html text")
 			return
 		}
-		content := doc.Content()*/
-		m.DataCh <- SitesInfo{title, URL, payload}
+		content := d.Content()
+		m.DataCh <- SitesInfo{title, URL, content}
 	})
-
-	// Set error handler
 	co.OnError(func(r *colly.Response, err error) {
 		zl.Debug().Err(err).Msg("Can't connect to URL")
 		m.DataCh <- SitesInfo{"", URL, err.Error()}
 		return
 	})
-	// Start scraping
 	co.Visit(URL)
-	// Wait until threads are finished
 	co.Wait()
 }
 
-func (m *Module) Listener() {
+func (m *Spider) Listener() {
 	defer m.mutex.Unlock()
 	m.mutex.Lock()
 	for info := range m.DataCh {
