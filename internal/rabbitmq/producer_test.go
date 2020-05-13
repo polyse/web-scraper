@@ -2,7 +2,8 @@ package rabbitmq
 
 import (
 	"encoding/json"
-	"reflect"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"strconv"
 	"sync"
 	"testing"
@@ -14,13 +15,10 @@ func TestQueue_Produce(t *testing.T) {
 		Uri:       "amqp://localhost:5672",
 		QueueName: "test",
 	})
-	if err != nil {
-		t.Fatal("Error on connection:", err)
-	}
+	require.NoError(t, err, "Error on connection")
 	defer func() {
-		if err := closeConn(); err != nil {
-			t.Fatal("Error on close connection:", err)
-		}
+		err := closeConn()
+		require.NoError(t, err, "Error on close connection")
 	}()
 
 	// create consumer
@@ -28,33 +26,31 @@ func TestQueue_Produce(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	msgs, err := c.ch.Consume("test", "", false, false, false, false, nil)
-	if err != nil {
-		t.Fatal("Error on creating consumer:", err)
-	}
+	require.NoError(t, err, "Error on creating consumer")
 	act := make([]Message, 10)
 	consumed := 0
+	quit := make(chan struct{})
 	go func() {
-		for m := range msgs {
-			// get message
-			var message Message
-			err := json.Unmarshal(m.Body, &message)
-			if err != nil {
-				t.Error("Error on consuming:", err)
-			}
-			t.Log("Consumed message:", message)
-			// save it to slice
-			index, err := strconv.Atoi(message.Payload)
-			if err != nil {
-				t.Error("Error on converting body to int:", err)
-			}
-			act[index] = message
-			err = m.Ack(false)
-			if err != nil {
-				t.Error("Error on act:", err)
-			}
-			consumed++
-			if consumed == 10 {
-				wg.Done()
+		for {
+			select {
+			case <-quit:
+				return
+			case m := <-msgs:
+				// get message
+				var message Message
+				err := json.Unmarshal(m.Body, &message)
+				if assert.NoError(t, err, "Error on consuming") {
+					t.Log("Consumed message:", message)
+					// save it to slice
+					act[consumed] = message
+					err = m.Ack(false)
+					assert.NoError(t, err, "Error on act")
+				}
+				// count even on failed consume
+				consumed++
+				if consumed == 10 {
+					wg.Done()
+				}
 			}
 		}
 	}()
@@ -68,18 +64,16 @@ func TestQueue_Produce(t *testing.T) {
 			Payload: strconv.Itoa(i),
 		}
 		err = c.Produce(&message)
-		if err != nil {
-			t.Errorf("Error on producing %d: %s", i, err)
+		if assert.NoError(t, err, "Error on producing %d: %s", i, err) {
+			t.Log("Produced:", message)
 		}
-		t.Log("Produced:", message)
 		exp[i] = message
 	}
 	wg.Wait()
+	close(quit)
 
 	// compare
-	t.Log("Exp:", exp)
-	t.Log("Act:", act)
-	if !reflect.DeepEqual(act, exp) {
-		t.Fatal("Exp != act")
-	}
+	t.Log(exp)
+	t.Log(act)
+	require.ElementsMatch(t, act, exp)
 }
