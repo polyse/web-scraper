@@ -8,8 +8,7 @@ import (
 
 // Config for connecting to RabbitMq
 type Config struct {
-	Host      string
-	Port      string
+	Uri       string
 	QueueName string
 }
 
@@ -28,8 +27,7 @@ type Message struct {
 }
 
 func Connect(c *Config) (*Queue, error) {
-	uri := fmt.Sprintf("amqp://%s:%s", c.Host, c.Port)
-	conn, err := amqp.Dial(uri)
+	conn, err := amqp.Dial(c.Uri)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open connection: %w", err)
 	}

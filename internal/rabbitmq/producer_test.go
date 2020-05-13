@@ -11,8 +11,7 @@ import (
 func TestQueue_Produce(t *testing.T) {
 	// connect to rabbitmq
 	c, err := Connect(&Config{
-		Host:      "localhost",
-		Port:      "5672",
+		Uri:       "amqp://localhost:5672",
 		QueueName: "test",
 	})
 	if err != nil {
