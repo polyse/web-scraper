@@ -73,7 +73,5 @@ func TestQueue_Produce(t *testing.T) {
 	close(quit)
 
 	// compare
-	t.Log(exp)
-	t.Log(act)
 	require.ElementsMatch(t, act, exp)
 }
