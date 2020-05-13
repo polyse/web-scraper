@@ -10,7 +10,7 @@ import (
 
 func TestQueue_Produce(t *testing.T) {
 	// connect to rabbitmq
-	c, err := Connect(&Config{
+	c, closeConn, err := Connect(&Config{
 		Uri:       "amqp://localhost:5672",
 		QueueName: "test",
 	})
@@ -18,7 +18,7 @@ func TestQueue_Produce(t *testing.T) {
 		t.Fatal("Error on connection:", err)
 	}
 	defer func() {
-		if err := c.Close(); err != nil {
+		if err := closeConn(); err != nil {
 			t.Fatal("Error on close connection:", err)
 		}
 	}()

@@ -26,24 +26,25 @@ type Message struct {
 	Payload string
 }
 
-func Connect(c *Config) (*Queue, error) {
+func Connect(c *Config) (*Queue, func() error, error) {
 	conn, err := amqp.Dial(c.Uri)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open connection: %w", err)
+		return nil, nil, fmt.Errorf("failed to open connection: %w", err)
 	}
 	ch, err := conn.Channel()
 	if err != nil {
-		return nil, fmt.Errorf("failed to open channel: %w", err)
+		return nil, nil, fmt.Errorf("failed to open channel: %w", err)
 	}
 	q, err := ch.QueueDeclare(c.QueueName, true, false, false, false, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to declare a queue: %w", err)
+		return nil, nil, fmt.Errorf("failed to declare a queue: %w", err)
 	}
-	return &Queue{
+	queue := &Queue{
 		conn: conn,
 		ch:   ch,
 		q:    q,
-	}, nil
+	}
+	return queue, queue.close, nil
 }
 
 func (q *Queue) Produce(m *Message) error {
@@ -62,7 +63,7 @@ func (q *Queue) Produce(m *Message) error {
 	return nil
 }
 
-func (q *Queue) Close() error {
+func (q *Queue) close() error {
 	err := q.ch.Close()
 	if err != nil {
 		return fmt.Errorf("failed to close channel: %w", err)
