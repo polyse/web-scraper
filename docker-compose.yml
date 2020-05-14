@@ -1,0 +1,21 @@
+version: "3.3"
+
+services:
+  rabbitmq:
+    image: rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=user
+      - RABBITMQ_DEFAULT_PASS=passwd
+  database:
+    image: polyse/database
+    volumes:
+      - ./tmp/db:/var/data
+    environment:
+      - LOG_LEVEL=debug
+    ports:
+      - 9000:9000
+  scrapper:
+    image: polyse/web-scrapper
+    depends_on:
+      - database
+      - rabbitmq
