@@ -7,6 +7,7 @@ package main
 
 import (
 	"github.com/polyse/web-scraper/internal/api"
+	"github.com/polyse/web-scraper/internal/rabbitmq"
 	"github.com/polyse/web-scraper/internal/spider"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -20,22 +21,29 @@ func initApp() (*api.API, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	spider, err := initSpider(mainConfig)
+	queue, cleanup, err := initRabbitmq(mainConfig)
 	if err != nil {
 		return nil, nil, err
 	}
-	apiAPI, cleanup, err := initApi(mainConfig, spider)
+	spider, err := initSpider(mainConfig, queue)
 	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	apiAPI, cleanup2, err := initApi(mainConfig, spider)
+	if err != nil {
+		cleanup()
 		return nil, nil, err
 	}
 	return apiAPI, func() {
+		cleanup2()
 		cleanup()
 	}, nil
 }
 
 // wire.go:
 
-func initSpider(cfg *config) (*spider.Spider, error) {
+func initSpider(cfg *config, queue *rabbitmq.Queue) (*spider.Spider, error) {
 	logLevel, err := zerolog.ParseLevel(cfg.LogLevel)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("Can't parse loglevel")
@@ -43,12 +51,25 @@ func initSpider(cfg *config) (*spider.Spider, error) {
 	zerolog.SetGlobalLevel(logLevel)
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-	return spider.NewSpider()
+	return spider.NewSpider(queue)
 }
 
 func initApi(cfg *config, mod *spider.Spider) (*api.API, func(), error) {
 	c, err := api.New(cfg.Listen, mod)
 	return c, func() {
 		c.Close()
+	}, err
+}
+
+func initRabbitmq(cfg *config) (*rabbitmq.Queue, func(), error) {
+	q, closer, err := rabbitmq.Connect(&rabbitmq.Config{
+		Uri:       cfg.RabbitmqUri,
+		QueueName: cfg.QueueName,
+	})
+	return q, func() {
+		err := closer()
+		if err != nil {
+			log.Debug().Msgf("Error on close queue: %s", err)
+		}
 	}, err
 }

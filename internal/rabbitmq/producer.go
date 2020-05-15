@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/streadway/amqp"
+	"time"
 )
 
 // Config for connecting to RabbitMq
@@ -24,6 +25,7 @@ type Message struct {
 	Title   string
 	Url     string
 	Payload string
+	Date    *time.Time `json:",omitempty"` // without pointer "omitempty" won't work
 }
 
 func Connect(c *Config) (*Queue, func() error, error) {

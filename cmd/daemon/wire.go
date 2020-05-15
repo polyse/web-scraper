@@ -3,6 +3,7 @@
 package main
 
 import (
+	"github.com/polyse/web-scraper/internal/rabbitmq"
 	"os"
 
 	"github.com/google/wire"
@@ -13,11 +14,11 @@ import (
 )
 
 func initApp() (*api.API, func(), error) {
-	wire.Build(newConfig, initSpider, initApi)
+	wire.Build(newConfig, initSpider, initApi, initRabbitmq)
 	return nil, nil, nil
 }
 
-func initSpider(cfg *config) (*spider.Spider, error) {
+func initSpider(cfg *config, queue *rabbitmq.Queue) (*spider.Spider, error) {
 	logLevel, err := zerolog.ParseLevel(cfg.LogLevel)
 	if err != nil {
 		zl.Fatal().Err(err).Msgf("Can't parse loglevel")
@@ -25,12 +26,25 @@ func initSpider(cfg *config) (*spider.Spider, error) {
 	zerolog.SetGlobalLevel(logLevel)
 	zl.Logger = zl.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-	return spider.NewSpider()
+	return spider.NewSpider(queue)
 }
 
 func initApi(cfg *config, mod *spider.Spider) (*api.API, func(), error) {
 	c, err := api.New(cfg.Listen, mod)
 	return c, func() {
 		c.Close()
+	}, err
+}
+
+func initRabbitmq(cfg *config) (*rabbitmq.Queue, func(), error) {
+	q, closer, err := rabbitmq.Connect(&rabbitmq.Config{
+		Uri:       cfg.RabbitmqUri,
+		QueueName: cfg.QueueName,
+	})
+	return q, func() {
+		err := closer()
+		if err != nil {
+			zl.Debug().Msgf("Error on close queue: %s", err)
+		}
 	}, err
 }
