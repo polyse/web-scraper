@@ -3,8 +3,9 @@ package rabbitmq
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/streadway/amqp"
 	"time"
+
+	"github.com/streadway/amqp"
 )
 
 // Config for connecting to RabbitMq

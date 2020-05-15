@@ -6,12 +6,13 @@
 package main
 
 import (
+	"os"
+
 	"github.com/polyse/web-scraper/internal/api"
 	"github.com/polyse/web-scraper/internal/rabbitmq"
 	"github.com/polyse/web-scraper/internal/spider"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"os"
 )
 
 // Injectors from wire.go:

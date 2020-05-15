@@ -2,10 +2,11 @@ package spider
 
 import (
 	"fmt"
-	"github.com/polyse/web-scraper/internal/rabbitmq"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/polyse/web-scraper/internal/rabbitmq"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/bobesa/go-domain-util/domainutil"

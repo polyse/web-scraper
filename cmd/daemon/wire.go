@@ -3,8 +3,9 @@
 package main
 
 import (
-	"github.com/polyse/web-scraper/internal/rabbitmq"
 	"os"
+
+	"github.com/polyse/web-scraper/internal/rabbitmq"
 
 	"github.com/google/wire"
 	"github.com/polyse/web-scraper/internal/api"
