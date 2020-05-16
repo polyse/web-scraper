@@ -21,12 +21,17 @@ type Queue struct {
 	q    amqp.Queue
 }
 
+// Source structure for domain\article\site\source description.
+type Source struct {
+	Date  *time.Time `json:"date,omitempty"` // without pointer "omitempty" won't work
+	Title string     `json:"title"`
+}
+
 // Message for producing to queue
 type Message struct {
-	Source string     `json:"source"`
-	Url    string     `json:"url"`
-	Data   string     `json:"data"`
-	Date   *time.Time `json:"date,omitempty"` // without pointer "omitempty" won't work
+	Source
+	Url  string `json:"url"`
+	Data string `json:"data"`
 }
 
 func Connect(c *Config) (*Queue, func() error, error) {
