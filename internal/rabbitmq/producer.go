@@ -23,10 +23,10 @@ type Queue struct {
 
 // Message for producing to queue
 type Message struct {
-	Title   string
-	Url     string
-	Payload string
-	Date    *time.Time `json:",omitempty"` // without pointer "omitempty" won't work
+	Source string     `json:"source"`
+	Url    string     `json:"url"`
+	Data   string     `json:"data"`
+	Date   *time.Time `json:"date,omitempty"` // without pointer "omitempty" won't work
 }
 
 func Connect(c *Config) (*Queue, func() error, error) {

@@ -60,9 +60,9 @@ func TestQueue_Produce(t *testing.T) {
 	exp := make([]Message, 10)
 	for i := 0; i < 10; i++ {
 		message := Message{
-			Title:   "Title",
-			Url:     "Url",
-			Payload: strconv.Itoa(i),
+			Source: "Source",
+			Url:    "Url",
+			Data:   strconv.Itoa(i),
 		}
 		err = c.Produce(&message)
 		if assert.NoError(t, err, "Error on producing %d: %s", i, err) {
