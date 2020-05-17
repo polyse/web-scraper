@@ -26,7 +26,7 @@ func TestQueue_Produce(t *testing.T) {
 	// WaitGroup for waiting all messages to deliver
 	var wg sync.WaitGroup
 	wg.Add(1)
-	msgs, err := c.ch.Consume("test", "", false, false, false, false, nil)
+	msgs, err := c.Ch.Consume("test", "", false, false, false, false, nil)
 	require.NoError(t, err, "Error on creating consumer")
 	act := make([]Message, 10)
 	consumed := 0
@@ -60,9 +60,12 @@ func TestQueue_Produce(t *testing.T) {
 	exp := make([]Message, 10)
 	for i := 0; i < 10; i++ {
 		message := Message{
-			Title:   "Title",
-			Url:     "Url",
-			Payload: strconv.Itoa(i),
+			Source: Source{
+				Date:  nil,
+				Title: "Title",
+			},
+			Url:  "Url",
+			Data: strconv.Itoa(i),
 		}
 		err = c.Produce(&message)
 		if assert.NoError(t, err, "Error on producing %d: %s", i, err) {

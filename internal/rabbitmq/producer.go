@@ -17,16 +17,21 @@ type Config struct {
 // Queue holds a connection and opened channel with queue
 type Queue struct {
 	conn *amqp.Connection
-	ch   *amqp.Channel
+	Ch   *amqp.Channel
 	q    amqp.Queue
+}
+
+// Source structure for domain\article\site\source description.
+type Source struct {
+	Date  *time.Time `json:"date,omitempty"` // without pointer "omitempty" won't work
+	Title string     `json:"title"`
 }
 
 // Message for producing to queue
 type Message struct {
-	Title   string
-	Url     string
-	Payload string
-	Date    *time.Time `json:",omitempty"` // without pointer "omitempty" won't work
+	Source
+	Url  string `json:"url"`
+	Data string `json:"data"`
 }
 
 func Connect(c *Config) (*Queue, func() error, error) {
@@ -44,7 +49,7 @@ func Connect(c *Config) (*Queue, func() error, error) {
 	}
 	queue := &Queue{
 		conn: conn,
-		ch:   ch,
+		Ch:   ch,
 		q:    q,
 	}
 	return queue, queue.close, nil
@@ -55,7 +60,7 @@ func (q *Queue) Produce(m *Message) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal message: %w", err)
 	}
-	err = q.ch.Publish("", q.q.Name, false, false, amqp.Publishing{
+	err = q.Ch.Publish("", q.q.Name, false, false, amqp.Publishing{
 		ContentType:     "application/json",
 		ContentEncoding: "UTF-8",
 		Body:            body,
@@ -67,7 +72,7 @@ func (q *Queue) Produce(m *Message) error {
 }
 
 func (q *Queue) close() error {
-	err := q.ch.Close()
+	err := q.Ch.Close()
 	if err != nil {
 		return fmt.Errorf("failed to close channel: %w", err)
 	}

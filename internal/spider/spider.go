@@ -2,6 +2,7 @@ package spider
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,7 +21,7 @@ type Spider struct {
 	DataCh        chan rabbitmq.Message
 	mutex         *sync.Mutex
 	currentDomain string
-	queue         *rabbitmq.Queue
+	Queue         *rabbitmq.Queue
 }
 
 func NewSpider(queue *rabbitmq.Queue) (*Spider, error) {
@@ -28,7 +29,7 @@ func NewSpider(queue *rabbitmq.Queue) (*Spider, error) {
 		DataCh:        make(chan rabbitmq.Message),
 		mutex:         &sync.Mutex{},
 		currentDomain: "",
-		queue:         queue,
+		Queue:         queue,
 	}
 	return m, nil
 }
@@ -65,6 +66,14 @@ func (m *Spider) collyScrapper(URL string) {
 		e.Request.Visit(fullLink)
 	})
 
+	t := time.Time{}
+
+	co.OnHTML("dateformat", func(e *colly.HTMLElement) {
+		tm := e.Attr("time")
+		date, _ := strconv.ParseInt(tm, 10, 64)
+		t = time.Unix(date, 0)
+	})
+
 	co.OnResponse(func(r *colly.Response) {
 		payload := string(r.Body[:])
 		doc, err := goquery.NewDocumentFromReader(strings.NewReader(payload))
@@ -73,6 +82,7 @@ func (m *Spider) collyScrapper(URL string) {
 				Msg("Can't load html text")
 			return
 		}
+
 		title := doc.Find("Title").Text()
 		d, err := readability.NewDocument(payload)
 		if err != nil {
@@ -81,7 +91,13 @@ func (m *Spider) collyScrapper(URL string) {
 			return
 		}
 		content := d.Content()
-		m.DataCh <- rabbitmq.Message{Title: title, Url: URL, Payload: content}
+		m.DataCh <- rabbitmq.Message{
+			Source: rabbitmq.Source{
+				Date:  &t,
+				Title: title,
+			},
+			Url:  URL,
+			Data: content}
 	})
 	co.OnError(func(r *colly.Response, err error) {
 		zl.Debug().Err(err).Msg("Can't connect to URL")
@@ -95,7 +111,7 @@ func (m *Spider) Listener() {
 	defer m.mutex.Unlock()
 	m.mutex.Lock()
 	for info := range m.DataCh {
-		if err := m.queue.Produce(&info); err != nil {
+		if err := m.Queue.Produce(&info); err != nil {
 			zl.Error().Err(fmt.Errorf("cannot produce message for '%s': %s", m.currentDomain, err))
 		} else {
 			zl.Debug().Msgf("Message for '%s' produced: %v", m.currentDomain, info)
