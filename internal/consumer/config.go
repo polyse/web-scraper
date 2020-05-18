@@ -12,7 +12,7 @@ type config struct {
 	RabbitmqUri    string        `env:"RABBITMQ_URI" envDefault:"amqp://localhost:5672"`
 	QueueName      string        `env:"RABBITMQ_QUEUE" envDefault:"sites-info"`
 	NumDocument    int           `env:"NUM_DOC" envDefault:"10000"`
-	Timeout        time.Duration `env:"TIMEOUT" envDefault:"100"`
+	Timeout        time.Duration `env:"TIMEOUT" envDefault:"100s"`
 	CollectionName string        `env:"COLL_NAME" envDefault:"news"`
 }
 

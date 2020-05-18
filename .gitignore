@@ -1,3 +1,2 @@
 .idea/
-cmd/daemon/daemon.exe
-go.sum
+*.exe

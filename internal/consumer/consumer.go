@@ -27,7 +27,7 @@ type Сonsumer struct {
 func main() {
 	cfg, err := newConfig()
 	if err != nil {
-		zl.Fatal().Msgf("Can't parse config")
+		zl.Fatal().Err(err).Msgf("Can't parse config")
 	}
 
 	logLevel, err := zerolog.ParseLevel(cfg.LogLevel)
@@ -47,7 +47,9 @@ func main() {
 	}
 	defer closer()
 
+	zl.Debug().Msg("Connect to rabbit")
 	c := InitConsumer(cfg, q)
+	zl.Debug().Msg("Correct init")
 	c.StartConsume()
 }
 
@@ -127,6 +129,7 @@ func (b *Сonsumer) Listener(dataCh <-chan amqp.Delivery) {
 	for {
 		select {
 		case d := <-dataCh:
+			zl.Debug().Msgf("Got message")
 			message := database_sdk.RawData{}
 			err := json.Unmarshal(d.Body, message)
 			if err != nil {
@@ -146,10 +149,12 @@ func (b *Сonsumer) Listener(dataCh <-chan amqp.Delivery) {
 				}
 			}
 		case <-time.After(b.timeout):
+			zl.Debug().Msg("Timeout end")
 			b.SaveMessages(messages, deliverys)
 			count = 0
 			messages = database_sdk.Documents{}
 		case <-b.quit:
+			zl.Debug().Msg("Finish")
 			b.SaveMessages(messages, deliverys)
 			return
 		}
