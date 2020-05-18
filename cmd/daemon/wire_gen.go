@@ -6,9 +6,7 @@
 package main
 
 import (
-	"github.com/polyse/database-sdk"
 	"github.com/polyse/web-scraper/internal/api"
-	"github.com/polyse/web-scraper/internal/broker"
 	"github.com/polyse/web-scraper/internal/rabbitmq"
 	"github.com/polyse/web-scraper/internal/spider"
 	"github.com/rs/zerolog"
@@ -32,8 +30,7 @@ func initApp() (*api.API, func(), error) {
 		cleanup()
 		return nil, nil, err
 	}
-	broker := InitBroker(mainConfig, queue)
-	apiAPI, cleanup2, err := initApi(mainConfig, spider, broker)
+	apiAPI, cleanup2, err := initApi(mainConfig, spider)
 	if err != nil {
 		cleanup()
 		return nil, nil, err
@@ -57,8 +54,8 @@ func initSpider(cfg *config, queue *rabbitmq.Queue) (*spider.Spider, error) {
 	return spider.NewSpider(queue)
 }
 
-func initApi(cfg *config, mod *spider.Spider, b *broker.Broker) (*api.API, func(), error) {
-	c, err := api.New(cfg.Listen, mod, b)
+func initApi(cfg *config, mod *spider.Spider) (*api.API, func(), error) {
+	c, err := api.New(cfg.Listen, mod)
 	return c, func() {
 		c.Close()
 	}, err
@@ -75,9 +72,4 @@ func initRabbitmq(cfg *config) (*rabbitmq.Queue, func(), error) {
 			log.Debug().Msgf("Error on close queue: %s", err)
 		}
 	}, err
-}
-
-func InitBroker(cfg *config, q *rabbitmq.Queue) *broker.Broker {
-	newclient := database_sdk.NewDBClient(cfg.RabbitmqUri)
-	return broker.NewBroker(q, cfg.RabbitmqUri, cfg.CollectionName, cfg.QueueName, cfg.NumDocument, cfg.Timeout, newclient)
 }
