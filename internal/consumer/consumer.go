@@ -1,80 +1,47 @@
-package main
+package consumer
 
 import (
+	"context"
 	"encoding/json"
-	"os"
-	"reflect"
+	"sync"
 	"time"
 
 	database_sdk "github.com/polyse/database-sdk"
 	"github.com/polyse/web-scraper/internal/rabbitmq"
-	"github.com/rs/zerolog"
 	zl "github.com/rs/zerolog/log"
 	"github.com/streadway/amqp"
 )
 
-type Сonsumer struct {
+type Consumer struct {
 	q              *rabbitmq.Queue
 	url            string
 	numDoc         int
 	timeout        time.Duration
-	quit           chan struct{}
 	dbClient       *database_sdk.DBClient
 	collectionName string
 	queueName      string
+	ctx            context.Context
+	Wg             *sync.WaitGroup
 }
 
-func main() {
-	cfg, err := newConfig()
-	if err != nil {
-		zl.Fatal().Err(err).Msgf("Can't parse config")
-	}
-
-	logLevel, err := zerolog.ParseLevel(cfg.LogLevel)
-	if err != nil {
-		zl.Fatal().Err(err).Msgf("Can't parse loglevel")
-	}
-	zerolog.SetGlobalLevel(logLevel)
-	zl.Logger = zl.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-
-	q, closer, err := rabbitmq.Connect(&rabbitmq.Config{
-		Uri:       cfg.RabbitmqUri,
-		QueueName: cfg.QueueName,
-	})
-
-	if err != nil {
-		zl.Fatal().Msgf("Can't connect to rmq")
-	}
-	defer closer()
-
-	zl.Debug().Msg("Connect to rabbit")
-	c := InitConsumer(cfg, q)
-	zl.Debug().Msg("Correct init")
-	c.StartConsume()
-}
-
-func InitConsumer(cfg *config, q *rabbitmq.Queue) *Сonsumer {
-	newclient := database_sdk.NewDBClient(cfg.RabbitmqUri)
-	return NewConsumer(q, cfg.RabbitmqUri, cfg.CollectionName, cfg.QueueName, cfg.NumDocument, cfg.Timeout, newclient)
-}
-
-func NewConsumer(q *rabbitmq.Queue, url, collectionName, queueName string, numDoc int, timeout time.Duration, client *database_sdk.DBClient) *Сonsumer {
-	return &Сonsumer{
+func NewConsumer(ctx context.Context, q *rabbitmq.Queue, url, collectionName, queueName string, numDoc int, timeout time.Duration, client *database_sdk.DBClient) *Consumer {
+	return &Consumer{
 		q:              q,
 		url:            url,
 		numDoc:         numDoc,
 		timeout:        timeout,
-		quit:           make(chan struct{}),
 		dbClient:       client,
 		collectionName: collectionName,
 		queueName:      queueName,
+		ctx:            ctx,
+		Wg:             &sync.WaitGroup{},
 	}
 }
 
-func (b *Сonsumer) StartConsume() {
-	dataCh, err := b.q.Ch.Consume(
-		b.queueName, // queue
-		"",          // consumer
+func (c *Consumer) StartConsume() error {
+	dataCh, err := c.q.Ch.Consume(
+		c.queueName, // queue
+		"",          // Consumer
 		false,       // auto-ack
 		false,       // exclusive
 		false,       // no-local
@@ -82,17 +49,17 @@ func (b *Сonsumer) StartConsume() {
 		nil,         // args
 	)
 	if err != nil {
-		zl.Warn().Err(err)
-		return
+		return err
 	}
-	go b.Listener(dataCh)
+	go c.listener(dataCh)
+	return nil
 }
 
-func (b *Сonsumer) SaveMessages(messages database_sdk.Documents, d []amqp.Delivery) {
-	insertDocs, err := b.dbClient.SaveData(b.collectionName, messages)
+func (c *Consumer) saveMessages(messages database_sdk.Documents, d []amqp.Delivery) {
+	_, err := c.dbClient.SaveData(c.collectionName, messages)
 	if err != nil {
 		zl.Debug().Err(err).Msg("Can't save date to db")
-		for i, _ := range messages.Documents {
+		for i := range messages.Documents {
 			err := d[i].Nack(false, true)
 			if err != nil {
 				zl.Warn().Err(err).Msg("Can't send nack")
@@ -100,38 +67,28 @@ func (b *Сonsumer) SaveMessages(messages database_sdk.Documents, d []amqp.Deliv
 		}
 		return
 	}
-	for i, message := range messages.Documents {
-		flag := false
-		for _, insertDoc := range insertDocs.Documents {
-			if reflect.DeepEqual(insertDoc.Url, message.Url) == true {
-				flag = true
-				err := d[i].Ack(false)
-				if err != nil {
-					zl.Warn().Err(err).Msgf("Can't ack messages")
-				}
-				break
-			}
-		}
-		if flag == false {
-			err := d[i].Nack(false, true)
-			if err != nil {
-				zl.Warn().Err(err).Msg("Can't send nack")
-			}
+	for i := range messages.Documents {
+		err := d[i].Ack(false)
+		if err != nil {
+			zl.Warn().Err(err).Msgf("Can't ack messages")
 		}
 	}
 }
 
-func (b *Сonsumer) Listener(dataCh <-chan amqp.Delivery) {
+func (c *Consumer) listener(dataCh <-chan amqp.Delivery) {
+	defer c.Wg.Done()
 	messages := database_sdk.Documents{}
 	count := 0
 	zl.Debug().Msg("Start listen")
-	deliverys := []amqp.Delivery{}
+	deliveries := []amqp.Delivery{}
 	for {
 		select {
-		case d := <-dataCh:
-			zl.Debug().Msgf("Got message")
+		case d, ok := <-dataCh:
+			if !ok {
+				continue
+			}
 			message := database_sdk.RawData{}
-			err := json.Unmarshal(d.Body, message)
+			err := json.Unmarshal(d.Body, &message)
 			if err != nil {
 				zl.Warn().Err(err).Msg("Can't unmarshal doc")
 				err := d.Nack(false, true)
@@ -140,22 +97,25 @@ func (b *Сonsumer) Listener(dataCh <-chan amqp.Delivery) {
 				}
 			} else {
 				count++
+				zl.Debug().Msgf("Got message %v", count)
 				messages.Documents = append(messages.Documents, message)
-				deliverys = append(deliverys, d)
-				if b.numDoc == count {
-					b.SaveMessages(messages, deliverys)
+				deliveries = append(deliveries, d)
+				if c.numDoc == count {
+					c.saveMessages(messages, deliveries)
 					count = 0
 					messages = database_sdk.Documents{}
+					deliveries = []amqp.Delivery{}
 				}
 			}
-		case <-time.After(b.timeout):
+		case <-time.After(c.timeout):
 			zl.Debug().Msg("Timeout end")
-			b.SaveMessages(messages, deliverys)
+			c.saveMessages(messages, deliveries)
 			count = 0
 			messages = database_sdk.Documents{}
-		case <-b.quit:
+			deliveries = []amqp.Delivery{}
+		case <-c.ctx.Done():
 			zl.Debug().Msg("Finish")
-			b.SaveMessages(messages, deliverys)
+			c.saveMessages(messages, deliveries)
 			return
 		}
 	}

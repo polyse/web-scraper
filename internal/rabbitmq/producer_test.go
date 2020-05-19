@@ -2,9 +2,11 @@ package rabbitmq
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,6 +34,8 @@ func TestQueue_Produce(t *testing.T) {
 	consumed := 0
 	quit := make(chan struct{})
 	go func() {
+		time.Sleep(time.Duration(5 * time.Second))
+		t.Log("Start listen")
 		for {
 			select {
 			case <-quit:
@@ -62,9 +66,9 @@ func TestQueue_Produce(t *testing.T) {
 		message := Message{
 			Source: Source{
 				Date:  nil,
-				Title: "Title",
+				Title: fmt.Sprintf("Title %v", i),
 			},
-			Url:  "Url",
+			Url:  fmt.Sprintf("Url %v", i),
 			Data: strconv.Itoa(i),
 		}
 		err = c.Produce(&message)

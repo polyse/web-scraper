@@ -7,12 +7,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/polyse/web-scraper/internal/extractor"
+
 	"github.com/polyse/web-scraper/internal/rabbitmq"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/bobesa/go-domain-util/domainutil"
 	"github.com/gocolly/colly/v2"
-	"github.com/mauidude/go-readability"
 	zl "github.com/rs/zerolog/log"
 	"go.zoe.im/surferua"
 )
@@ -84,13 +85,19 @@ func (m *Spider) collyScrapper(URL string) {
 		}
 
 		title := doc.Find("Title").Text()
-		d, err := readability.NewDocument(payload)
+		/*d, err := readability.NewDocument(payload)
 		if err != nil {
 			zl.Debug().Err(err).
 				Msg("Can't load html text")
 			return
 		}
-		content := d.Content()
+		content := d.Content()*/
+
+		actual, err := extractor.ExtractContentFromHTML(payload)
+		if err != nil {
+			zl.Debug().Err(err).Msgf("Can't parse")
+		}
+		content := extractor.Clean(actual)
 		m.DataCh <- rabbitmq.Message{
 			Source: rabbitmq.Source{
 				Date:  &t,
