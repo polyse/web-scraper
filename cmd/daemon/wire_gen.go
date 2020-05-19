@@ -6,13 +6,13 @@
 package main
 
 import (
-	"os"
-
 	"github.com/polyse/web-scraper/internal/api"
+	"github.com/polyse/web-scraper/internal/locker"
 	"github.com/polyse/web-scraper/internal/rabbitmq"
 	"github.com/polyse/web-scraper/internal/spider"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"os"
 )
 
 // Injectors from wire.go:
@@ -26,17 +26,25 @@ func initApp() (*api.API, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	spider, err := initSpider(mainConfig, queue)
+	conn, cleanup2, err := initLocker(mainConfig)
 	if err != nil {
 		cleanup()
 		return nil, nil, err
 	}
-	apiAPI, cleanup2, err := initApi(mainConfig, spider)
+	spider, err := initSpider(mainConfig, queue, conn)
 	if err != nil {
+		cleanup2()
+		cleanup()
+		return nil, nil, err
+	}
+	apiAPI, cleanup3, err := initApi(mainConfig, spider)
+	if err != nil {
+		cleanup2()
 		cleanup()
 		return nil, nil, err
 	}
 	return apiAPI, func() {
+		cleanup3()
 		cleanup2()
 		cleanup()
 	}, nil
@@ -44,7 +52,7 @@ func initApp() (*api.API, func(), error) {
 
 // wire.go:
 
-func initSpider(cfg *config, queue *rabbitmq.Queue) (*spider.Spider, error) {
+func initSpider(cfg *config, queue *rabbitmq.Queue, l *locker.Conn) (*spider.Spider, error) {
 	logLevel, err := zerolog.ParseLevel(cfg.LogLevel)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("Can't parse loglevel")
@@ -52,7 +60,7 @@ func initSpider(cfg *config, queue *rabbitmq.Queue) (*spider.Spider, error) {
 	zerolog.SetGlobalLevel(logLevel)
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-	return spider.NewSpider(queue)
+	return spider.NewSpider(queue, l)
 }
 
 func initApi(cfg *config, mod *spider.Spider) (*api.API, func(), error) {
@@ -71,6 +79,20 @@ func initRabbitmq(cfg *config) (*rabbitmq.Queue, func(), error) {
 		err := closer()
 		if err != nil {
 			log.Debug().Msgf("Error on close queue: %s", err)
+		}
+	}, err
+}
+
+func initLocker(cfg *config) (*locker.Conn, func(), error) {
+	c, closer, err := locker.NewConn(&locker.Config{
+		Network: cfg.LockerNetwork,
+		Addr:    cfg.LockerAddr,
+		Size:    cfg.LockerSize,
+	})
+	return c, func() {
+		err := closer()
+		if err != nil {
+			log.Debug().Msgf("Error on close locker: %s", err)
 		}
 	}, err
 }

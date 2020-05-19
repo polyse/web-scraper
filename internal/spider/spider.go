@@ -1,10 +1,13 @@
 package spider
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/polyse/web-scraper/internal/locker"
 
 	"github.com/polyse/web-scraper/internal/rabbitmq"
 
@@ -21,14 +24,16 @@ type Spider struct {
 	mutex         *sync.Mutex
 	currentDomain string
 	queue         *rabbitmq.Queue
+	l             *locker.Conn
 }
 
-func NewSpider(queue *rabbitmq.Queue) (*Spider, error) {
+func NewSpider(queue *rabbitmq.Queue, l *locker.Conn) (*Spider, error) {
 	m := &Spider{
 		DataCh:        make(chan rabbitmq.Message),
 		mutex:         &sync.Mutex{},
 		currentDomain: "",
 		queue:         queue,
+		l:             l,
 	}
 	return m, nil
 }
@@ -46,6 +51,14 @@ func (m *Spider) Colly(domain string) {
 }
 
 func (m *Spider) collyScrapper(URL string) {
+	// check if url is locked
+	err := lock(m.l, URL)
+	if err != nil {
+		zl.Debug().Err(err).Str("URL", URL).Msg("Failed to lock url")
+		return
+	}
+	zl.Debug().Str("URL", URL).Msg("Url is locked")
+
 	zl.Debug().Msgf("%v", m.currentDomain)
 	co := colly.NewCollector(
 		colly.AllowedDomains(m.currentDomain),
@@ -62,6 +75,13 @@ func (m *Spider) collyScrapper(URL string) {
 		link := e.Attr("href")
 		fullLink := e.Request.AbsoluteURL(link)
 		zl.Debug().Msgf("Find URL : %v", fullLink)
+		// check if url is locked
+		err := lock(m.l, fullLink)
+		if err != nil {
+			zl.Debug().Err(err).Str("URL", fullLink).Msg("Failed to lock url")
+			return
+		}
+		zl.Debug().Str("URL", fullLink).Msg("Url is locked")
 		e.Request.Visit(fullLink)
 	})
 
@@ -71,6 +91,7 @@ func (m *Spider) collyScrapper(URL string) {
 		if err != nil {
 			zl.Debug().Err(err).
 				Msg("Can't load html text")
+			unlock(m.l, r.Request.URL.String())
 			return
 		}
 		title := doc.Find("Title").Text()
@@ -78,6 +99,7 @@ func (m *Spider) collyScrapper(URL string) {
 		if err != nil {
 			zl.Debug().Err(err).
 				Msg("Can't load html text")
+			unlock(m.l, r.Request.URL.String())
 			return
 		}
 		content := d.Content()
@@ -85,6 +107,7 @@ func (m *Spider) collyScrapper(URL string) {
 	})
 	co.OnError(func(r *colly.Response, err error) {
 		zl.Debug().Err(err).Msg("Can't connect to URL")
+		unlock(m.l, r.Request.URL.String())
 		return
 	})
 	co.Visit(URL)
@@ -100,5 +123,29 @@ func (m *Spider) Listener() {
 		} else {
 			zl.Debug().Msgf("Message for '%s' produced: %v", m.currentDomain, info)
 		}
+	}
+}
+
+// Try to lock url
+func lock(l *locker.Conn, url string) error {
+	locked, err := l.TryLock(url)
+	if err != nil {
+		return fmt.Errorf("failed to lock url: %w", err)
+	}
+	if !locked {
+		return errors.New("url is locked")
+	}
+	return nil
+}
+
+// Try to unlock url
+func unlock(l *locker.Conn, url string) {
+	unlocked, err := l.Unlock(url)
+	if err != nil {
+		err := fmt.Errorf("failed to unlock url: %w", err)
+		zl.Debug().Err(err).Str("URL", url).Msg("Failed to unlock url")
+	}
+	if !unlocked {
+		zl.Debug().Str("URL", url).Msg("Link wasn't locked")
 	}
 }

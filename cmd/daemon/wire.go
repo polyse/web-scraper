@@ -5,6 +5,8 @@ package main
 import (
 	"os"
 
+	"github.com/polyse/web-scraper/internal/locker"
+
 	"github.com/polyse/web-scraper/internal/rabbitmq"
 
 	"github.com/google/wire"
@@ -15,11 +17,11 @@ import (
 )
 
 func initApp() (*api.API, func(), error) {
-	wire.Build(newConfig, initSpider, initApi, initRabbitmq)
+	wire.Build(newConfig, initSpider, initApi, initRabbitmq, initLocker)
 	return nil, nil, nil
 }
 
-func initSpider(cfg *config, queue *rabbitmq.Queue) (*spider.Spider, error) {
+func initSpider(cfg *config, queue *rabbitmq.Queue, l *locker.Conn) (*spider.Spider, error) {
 	logLevel, err := zerolog.ParseLevel(cfg.LogLevel)
 	if err != nil {
 		zl.Fatal().Err(err).Msgf("Can't parse loglevel")
@@ -27,7 +29,7 @@ func initSpider(cfg *config, queue *rabbitmq.Queue) (*spider.Spider, error) {
 	zerolog.SetGlobalLevel(logLevel)
 	zl.Logger = zl.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-	return spider.NewSpider(queue)
+	return spider.NewSpider(queue, l)
 }
 
 func initApi(cfg *config, mod *spider.Spider) (*api.API, func(), error) {
@@ -46,6 +48,20 @@ func initRabbitmq(cfg *config) (*rabbitmq.Queue, func(), error) {
 		err := closer()
 		if err != nil {
 			zl.Debug().Msgf("Error on close queue: %s", err)
+		}
+	}, err
+}
+
+func initLocker(cfg *config) (*locker.Conn, func(), error) {
+	c, closer, err := locker.NewConn(&locker.Config{
+		Network: cfg.LockerNetwork,
+		Addr:    cfg.LockerAddr,
+		Size:    cfg.LockerSize,
+	})
+	return c, func() {
+		err := closer()
+		if err != nil {
+			zl.Debug().Msgf("Error on close locker: %s", err)
 		}
 	}, err
 }
