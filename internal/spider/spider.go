@@ -2,10 +2,12 @@ package spider
 
 import (
 	"fmt"
-	"strconv"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	database_sdk "github.com/polyse/database-sdk"
 
 	"github.com/polyse/web-scraper/internal/extractor"
 
@@ -19,7 +21,7 @@ import (
 )
 
 type Spider struct {
-	DataCh        chan rabbitmq.Message
+	DataCh        chan database_sdk.RawData
 	mutex         *sync.Mutex
 	currentDomain string
 	Queue         *rabbitmq.Queue
@@ -27,7 +29,7 @@ type Spider struct {
 
 func NewSpider(queue *rabbitmq.Queue) (*Spider, error) {
 	m := &Spider{
-		DataCh:        make(chan rabbitmq.Message),
+		DataCh:        make(chan database_sdk.RawData),
 		mutex:         &sync.Mutex{},
 		currentDomain: "",
 		Queue:         queue,
@@ -43,7 +45,7 @@ func (m *Spider) Colly(domain string) {
 	m.mutex.Lock()
 	zl.Debug().
 		Msgf("Finish %v and start new", domain)
-	m.DataCh = make(chan rabbitmq.Message)
+	m.DataCh = make(chan database_sdk.RawData)
 	m.mutex.Unlock()
 }
 
@@ -57,7 +59,7 @@ func (m *Spider) collyScrapper(URL string) {
 
 	co.Limit(&colly.LimitRule{
 		Parallelism: 4,
-		RandomDelay: 1 * time.Second,
+		RandomDelay: 10 * time.Second,
 	})
 
 	co.OnHTML("a[href]", func(e *colly.HTMLElement) {
@@ -65,14 +67,6 @@ func (m *Spider) collyScrapper(URL string) {
 		fullLink := e.Request.AbsoluteURL(link)
 		zl.Debug().Msgf("Find URL : %v", fullLink)
 		e.Request.Visit(fullLink)
-	})
-
-	t := time.Time{}
-
-	co.OnHTML("dateformat", func(e *colly.HTMLElement) {
-		tm := e.Attr("time")
-		date, _ := strconv.ParseInt(tm, 10, 64)
-		t = time.Unix(date, 0)
 	})
 
 	co.OnResponse(func(r *colly.Response) {
@@ -83,27 +77,26 @@ func (m *Spider) collyScrapper(URL string) {
 				Msg("Can't load html text")
 			return
 		}
-
 		title := doc.Find("Title").Text()
-		/*d, err := readability.NewDocument(payload)
-		if err != nil {
-			zl.Debug().Err(err).
-				Msg("Can't load html text")
-			return
-		}
-		content := d.Content()*/
-
 		actual, err := extractor.ExtractContentFromHTML(payload)
 		if err != nil {
 			zl.Debug().Err(err).Msgf("Can't parse")
 		}
 		content := extractor.Clean(actual)
-		m.DataCh <- rabbitmq.Message{
-			Source: rabbitmq.Source{
-				Date:  &t,
+		times := r.Headers.Values("Last-Modified")
+		if len(times) == 0 {
+			times = r.Headers.Values("Date")
+		}
+		t, err := time.Parse(time.RFC1123, times[0])
+		if err != nil {
+			t = time.Time{}
+		}
+		m.DataCh <- database_sdk.RawData{
+			Source: database_sdk.Source{
+				Date:  t,
 				Title: title,
 			},
-			Url:  URL,
+			Url:  filepath.Join(r.Request.URL.Host, r.Request.URL.Path),
 			Data: content}
 	})
 	co.OnError(func(r *colly.Response, err error) {

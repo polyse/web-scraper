@@ -46,8 +46,8 @@ func initConsumer(ctx context.Context, cfg *config) (*consumer.Consumer, func(),
 		QueueName: cfg.QueueName,
 	})
 
-	newclient := database_sdk.NewDBClient(cfg.Server)
-	c := consumer.NewConsumer(ctx, q, cfg.RabbitmqUri, cfg.CollectionName, cfg.QueueName, cfg.NumDocument, cfg.Timeout, newclient)
+	newClient := database_sdk.NewDBClient(cfg.Server)
+	c := consumer.NewConsumer(ctx, q, cfg.RabbitmqUri, cfg.CollectionName, cfg.QueueName, cfg.NumDocument, cfg.Timeout, newClient)
 
 	return c, func() {
 		if err := closer(); err != nil {

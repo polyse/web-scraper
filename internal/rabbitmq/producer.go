@@ -3,8 +3,8 @@ package rabbitmq
 import (
 	"encoding/json"
 	"fmt"
-	"time"
 
+	database_sdk "github.com/polyse/database-sdk"
 	"github.com/streadway/amqp"
 )
 
@@ -19,19 +19,6 @@ type Queue struct {
 	conn *amqp.Connection
 	Ch   *amqp.Channel
 	q    amqp.Queue
-}
-
-// Source structure for domain\article\site\source description.
-type Source struct {
-	Date  *time.Time `json:"date,omitempty"` // without pointer "omitempty" won't work
-	Title string     `json:"title"`
-}
-
-// Message for producing to queue
-type Message struct {
-	Source
-	Url  string `json:"url"`
-	Data string `json:"data"`
 }
 
 func Connect(c *Config) (*Queue, func() error, error) {
@@ -55,8 +42,8 @@ func Connect(c *Config) (*Queue, func() error, error) {
 	return queue, queue.close, nil
 }
 
-func (q *Queue) Produce(m *Message) error {
-	body, err := json.Marshal(&m)
+func (q *Queue) Produce(rawData *database_sdk.RawData) error {
+	body, err := json.Marshal(&rawData)
 	if err != nil {
 		return fmt.Errorf("failed to marshal message: %w", err)
 	}
