@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	database_sdk "github.com/polyse/database-sdk"
+	sdk "github.com/polyse/database-sdk"
 	"github.com/polyse/web-scraper/internal/rabbitmq"
 	zl "github.com/rs/zerolog/log"
 	"github.com/streadway/amqp"
@@ -17,14 +17,14 @@ type Consumer struct {
 	url            string
 	numDoc         int
 	timeout        time.Duration
-	dbClient       *database_sdk.DBClient
+	dbClient       *sdk.DBClient
 	collectionName string
 	queueName      string
 	ctx            context.Context
 	Wg             *sync.WaitGroup
 }
 
-func NewConsumer(ctx context.Context, q *rabbitmq.Queue, url, collectionName, queueName string, numDoc int, timeout time.Duration, client *database_sdk.DBClient) *Consumer {
+func NewConsumer(ctx context.Context, q *rabbitmq.Queue, url, collectionName, queueName string, numDoc int, timeout time.Duration, client *sdk.DBClient) *Consumer {
 	return &Consumer{
 		q:              q,
 		url:            url,
@@ -43,7 +43,7 @@ func (c *Consumer) StartConsume() error {
 		c.queueName, // queue
 		"",          // Consumer
 		false,       // auto-ack
-		false,       // exclusive
+		true,        // exclusive
 		false,       // no-local
 		false,       // no-wait
 		nil,         // args
@@ -55,7 +55,7 @@ func (c *Consumer) StartConsume() error {
 	return nil
 }
 
-func (c *Consumer) saveMessages(messages database_sdk.Documents, d []amqp.Delivery) {
+func (c *Consumer) saveMessages(messages sdk.Documents, d []amqp.Delivery) {
 	_, err := c.dbClient.SaveData(c.collectionName, messages)
 	if err != nil {
 		zl.Debug().Err(err).Msg("Can't save date to db")
@@ -77,7 +77,7 @@ func (c *Consumer) saveMessages(messages database_sdk.Documents, d []amqp.Delive
 
 func (c *Consumer) listener(dataCh <-chan amqp.Delivery) {
 	defer c.Wg.Done()
-	messages := database_sdk.Documents{}
+	messages := sdk.Documents{}
 	count := 0
 	zl.Debug().Msg("Start listen")
 	deliveries := []amqp.Delivery{}
@@ -87,7 +87,7 @@ func (c *Consumer) listener(dataCh <-chan amqp.Delivery) {
 			if !ok {
 				continue
 			}
-			message := database_sdk.RawData{}
+			message := sdk.RawData{}
 			err := json.Unmarshal(d.Body, &message)
 			if err != nil {
 				zl.Warn().Err(err).Msg("Can't unmarshal doc")
@@ -103,7 +103,7 @@ func (c *Consumer) listener(dataCh <-chan amqp.Delivery) {
 				if c.numDoc == count {
 					c.saveMessages(messages, deliveries)
 					count = 0
-					messages = database_sdk.Documents{}
+					messages = sdk.Documents{}
 					deliveries = []amqp.Delivery{}
 				}
 			}
@@ -111,7 +111,7 @@ func (c *Consumer) listener(dataCh <-chan amqp.Delivery) {
 			zl.Debug().Msg("Timeout end")
 			c.saveMessages(messages, deliveries)
 			count = 0
-			messages = database_sdk.Documents{}
+			messages = sdk.Documents{}
 			deliveries = []amqp.Delivery{}
 		case <-c.ctx.Done():
 			zl.Debug().Msg("Finish")

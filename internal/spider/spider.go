@@ -7,21 +7,18 @@ import (
 	"sync"
 	"time"
 
-	database_sdk "github.com/polyse/database-sdk"
-
-	"github.com/polyse/web-scraper/internal/extractor"
-
-	"github.com/polyse/web-scraper/internal/rabbitmq"
-
 	"github.com/PuerkitoBio/goquery"
 	"github.com/bobesa/go-domain-util/domainutil"
 	"github.com/gocolly/colly/v2"
+	sdk "github.com/polyse/database-sdk"
+	"github.com/polyse/web-scraper/internal/extractor"
+	"github.com/polyse/web-scraper/internal/rabbitmq"
 	zl "github.com/rs/zerolog/log"
 	"go.zoe.im/surferua"
 )
 
 type Spider struct {
-	DataCh        chan database_sdk.RawData
+	DataCh        chan sdk.RawData
 	mutex         *sync.Mutex
 	currentDomain string
 	Queue         *rabbitmq.Queue
@@ -29,7 +26,7 @@ type Spider struct {
 
 func NewSpider(queue *rabbitmq.Queue) (*Spider, error) {
 	m := &Spider{
-		DataCh:        make(chan database_sdk.RawData),
+		DataCh:        make(chan sdk.RawData),
 		mutex:         &sync.Mutex{},
 		currentDomain: "",
 		Queue:         queue,
@@ -45,7 +42,7 @@ func (m *Spider) Colly(domain string) {
 	m.mutex.Lock()
 	zl.Debug().
 		Msgf("Finish %v and start new", domain)
-	m.DataCh = make(chan database_sdk.RawData)
+	m.DataCh = make(chan sdk.RawData)
 	m.mutex.Unlock()
 }
 
@@ -91,8 +88,9 @@ func (m *Spider) collyScrapper(URL string) {
 		if err != nil {
 			t = time.Time{}
 		}
-		m.DataCh <- database_sdk.RawData{
-			Source: database_sdk.Source{
+		zl.Debug().Msgf("%v", filepath.Join(r.Request.URL.Host, r.Request.URL.Path))
+		m.DataCh <- sdk.RawData{
+			Source: sdk.Source{
 				Date:  t,
 				Title: title,
 			},

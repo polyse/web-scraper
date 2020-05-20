@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	database_sdk "github.com/polyse/database-sdk"
+	sdk "github.com/polyse/database-sdk"
 	"github.com/polyse/web-scraper/internal/consumer"
 	"github.com/polyse/web-scraper/internal/rabbitmq"
 	"github.com/rs/zerolog"
@@ -46,7 +46,7 @@ func initConsumer(ctx context.Context, cfg *config) (*consumer.Consumer, func(),
 		QueueName: cfg.QueueName,
 	})
 
-	newClient := database_sdk.NewDBClient(cfg.Server)
+	newClient := sdk.NewDBClient(cfg.Server)
 	c := consumer.NewConsumer(ctx, q, cfg.RabbitmqUri, cfg.CollectionName, cfg.QueueName, cfg.NumDocument, cfg.Timeout, newClient)
 
 	return c, func() {

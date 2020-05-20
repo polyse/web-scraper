@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	database_sdk "github.com/polyse/database-sdk"
+	sdk "github.com/polyse/database-sdk"
 	"github.com/streadway/amqp"
 )
 
@@ -42,7 +42,7 @@ func Connect(c *Config) (*Queue, func() error, error) {
 	return queue, queue.close, nil
 }
 
-func (q *Queue) Produce(rawData *database_sdk.RawData) error {
+func (q *Queue) Produce(rawData *sdk.RawData) error {
 	body, err := json.Marshal(&rawData)
 	if err != nil {
 		return fmt.Errorf("failed to marshal message: %w", err)
