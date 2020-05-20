@@ -1,9 +1,12 @@
 package spider
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/polyse/web-scraper/internal/rabbitmq"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/bobesa/go-domain-util/domainutil"
@@ -14,24 +17,18 @@ import (
 )
 
 type Spider struct {
-	DataCh        chan SitesInfo
+	DataCh        chan rabbitmq.Message
 	mutex         *sync.Mutex
 	currentDomain string
-	info          []SitesInfo
+	queue         *rabbitmq.Queue
 }
 
-type SitesInfo struct {
-	Title   string
-	URL     string
-	Payload string
-}
-
-func NewSpider() (*Spider, error) {
+func NewSpider(queue *rabbitmq.Queue) (*Spider, error) {
 	m := &Spider{
-		DataCh:        make(chan SitesInfo),
+		DataCh:        make(chan rabbitmq.Message),
 		mutex:         &sync.Mutex{},
 		currentDomain: "",
-		info:          []SitesInfo{},
+		queue:         queue,
 	}
 	return m, nil
 }
@@ -44,10 +41,8 @@ func (m *Spider) Colly(domain string) {
 	m.mutex.Lock()
 	zl.Debug().
 		Msgf("Finish %v and start new", domain)
-	m.DataCh = make(chan SitesInfo)
+	m.DataCh = make(chan rabbitmq.Message)
 	m.mutex.Unlock()
-	zl.Debug().
-		Msgf("%v", m.info)
 }
 
 func (m *Spider) collyScrapper(URL string) {
@@ -86,11 +81,10 @@ func (m *Spider) collyScrapper(URL string) {
 			return
 		}
 		content := d.Content()
-		m.DataCh <- SitesInfo{title, URL, content}
+		m.DataCh <- rabbitmq.Message{Source: title, Url: URL, Data: content}
 	})
 	co.OnError(func(r *colly.Response, err error) {
 		zl.Debug().Err(err).Msg("Can't connect to URL")
-		m.DataCh <- SitesInfo{"", URL, err.Error()}
 		return
 	})
 	co.Visit(URL)
@@ -101,6 +95,10 @@ func (m *Spider) Listener() {
 	defer m.mutex.Unlock()
 	m.mutex.Lock()
 	for info := range m.DataCh {
-		m.info = append(m.info, info)
+		if err := m.queue.Produce(&info); err != nil {
+			zl.Error().Err(fmt.Errorf("cannot produce message for '%s': %s", m.currentDomain, err))
+		} else {
+			zl.Debug().Msgf("Message for '%s' produced: %v", m.currentDomain, info)
+		}
 	}
 }
