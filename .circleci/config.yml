@@ -49,7 +49,10 @@ workflows:
   version: 2
   build-deploy-master:
     jobs:
-#      - test
+      - test:
+          filters:
+            branches:
+              ignore: master
       - build:
           filters:
             branches:
