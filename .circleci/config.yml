@@ -1,0 +1,68 @@
+version: 2.1
+jobs:
+  test:
+    docker:
+      - image: golang:1.14
+    working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
+    steps:
+      - checkout
+      - run: go get -v -t -d ./...
+      - run: go test -v ./...
+      - run: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.27.0
+      - run: golangci-lint run
+  build:
+    docker:
+      - image: circleci/buildpack-deps:stretch
+    environment:
+      IMAGE_NAME: docker.pkg.github.com/polyse/web-scraper/daemon
+    working_directory: ~/app
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Build Docker image
+          command: |
+            docker build -t $IMAGE_NAME:latest .
+      - run:
+          name: Push Docker Image
+          command: |
+            echo "$DOCKERHUB_PASS" | docker login docker.pkg.github.com --username "$DOCKERHUB_USERNAME" --password-stdin
+            docker tag $IMAGE_NAME:latest $IMAGE_NAME:$CIRCLE_SHA1
+            docker push $IMAGE_NAME:latest
+            docker push $IMAGE_NAME:$CIRCLE_SHA1
+  deploy:
+    docker:
+      - image: docker.pkg.github.com/polyse/deploy/deploy:latest
+        auth:
+          username: $DOCKERHUB_USERNAME
+          password: $DOCKERHUB_PASS
+        environment:
+          COMMIT_SHA: $CIRCLE_SHA1
+          KUBECONFIG: $KUBECONFIG
+    working_directory: ~/app
+    steps:
+      - checkout
+      - run:
+          name: Deploy
+          command: COMMIT_SHA=$CIRCLE_SHA1 SERVICE=web-scraper-daemon /deploy/deploy.sh
+
+workflows:
+  version: 2
+  build-deploy-master:
+    jobs:
+      - test:
+          filters:
+            branches:
+              ignore: master
+      - build:
+          filters:
+            branches:
+              only: master
+      #          requires:
+      #            - test
+      - deploy:
+          filters:
+            branches:
+              only: master
+          requires:
+            - build

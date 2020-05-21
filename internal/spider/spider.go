@@ -1,6 +1,8 @@
 package spider
 
 import (
+	"fmt"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -8,30 +10,26 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/bobesa/go-domain-util/domainutil"
 	"github.com/gocolly/colly/v2"
-	"github.com/mauidude/go-readability"
+	sdk "github.com/polyse/database-sdk"
+	"github.com/polyse/web-scraper/internal/extractor"
+	"github.com/polyse/web-scraper/internal/rabbitmq"
 	zl "github.com/rs/zerolog/log"
 	"go.zoe.im/surferua"
 )
 
 type Spider struct {
-	DataCh        chan SitesInfo
+	DataCh        chan sdk.RawData
 	mutex         *sync.Mutex
 	currentDomain string
-	info          []SitesInfo
+	Queue         *rabbitmq.Queue
 }
 
-type SitesInfo struct {
-	Title   string
-	URL     string
-	Payload string
-}
-
-func NewSpider() (*Spider, error) {
+func NewSpider(queue *rabbitmq.Queue) (*Spider, error) {
 	m := &Spider{
-		DataCh:        make(chan SitesInfo),
+		DataCh:        make(chan sdk.RawData),
 		mutex:         &sync.Mutex{},
 		currentDomain: "",
-		info:          []SitesInfo{},
+		Queue:         queue,
 	}
 	return m, nil
 }
@@ -44,10 +42,8 @@ func (m *Spider) Colly(domain string) {
 	m.mutex.Lock()
 	zl.Debug().
 		Msgf("Finish %v and start new", domain)
-	m.DataCh = make(chan SitesInfo)
+	m.DataCh = make(chan sdk.RawData)
 	m.mutex.Unlock()
-	zl.Debug().
-		Msgf("%v", m.info)
 }
 
 func (m *Spider) collyScrapper(URL string) {
@@ -58,16 +54,22 @@ func (m *Spider) collyScrapper(URL string) {
 		colly.UserAgent(surferua.New().String()),
 	)
 
-	co.Limit(&colly.LimitRule{
+	err := co.Limit(&colly.LimitRule{
 		Parallelism: 4,
-		RandomDelay: 1 * time.Second,
+		RandomDelay: 10 * time.Second,
 	})
+	if err != nil {
+		zl.Warn().Err(err).Msg("Can't set limit")
+	}
 
 	co.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		link := e.Attr("href")
 		fullLink := e.Request.AbsoluteURL(link)
 		zl.Debug().Msgf("Find URL : %v", fullLink)
-		e.Request.Visit(fullLink)
+		err := e.Request.Visit(fullLink)
+		if err != nil {
+			zl.Warn().Err(err).Msgf("Can't visit page : %v", fullLink)
+		}
 	})
 
 	co.OnResponse(func(r *colly.Response) {
@@ -79,21 +81,35 @@ func (m *Spider) collyScrapper(URL string) {
 			return
 		}
 		title := doc.Find("Title").Text()
-		d, err := readability.NewDocument(payload)
+		actual, err := extractor.ExtractContentFromHTML(payload)
 		if err != nil {
-			zl.Debug().Err(err).
-				Msg("Can't load html text")
-			return
+			zl.Debug().Err(err).Msgf("Can't parse")
 		}
-		content := d.Content()
-		m.DataCh <- SitesInfo{title, URL, content}
+		content := extractor.Clean(actual)
+		times := r.Headers.Values("Last-Modified")
+		if len(times) == 0 {
+			times = r.Headers.Values("Date")
+		}
+		t, err := time.Parse(time.RFC1123, times[0])
+		if err != nil {
+			t = time.Time{}
+		}
+		zl.Debug().Msgf("%v", filepath.Join(r.Request.URL.Host, r.Request.URL.Path))
+		m.DataCh <- sdk.RawData{
+			Source: sdk.Source{
+				Date:  t,
+				Title: title,
+			},
+			Url:  filepath.Join(r.Request.URL.Host, r.Request.URL.Path),
+			Data: content}
 	})
 	co.OnError(func(r *colly.Response, err error) {
 		zl.Debug().Err(err).Msg("Can't connect to URL")
-		m.DataCh <- SitesInfo{"", URL, err.Error()}
-		return
 	})
-	co.Visit(URL)
+	err = co.Visit(URL)
+	if err != nil {
+		zl.Warn().Err(err).Msgf("Can't visit page : %v", URL)
+	}
 	co.Wait()
 }
 
@@ -101,6 +117,10 @@ func (m *Spider) Listener() {
 	defer m.mutex.Unlock()
 	m.mutex.Lock()
 	for info := range m.DataCh {
-		m.info = append(m.info, info)
+		if err := m.Queue.Produce(&info); err != nil {
+			zl.Error().Err(fmt.Errorf("cannot produce message for '%s': %s", m.currentDomain, err))
+		} else {
+			zl.Debug().Msgf("Message for '%s' produced: %v", m.currentDomain, info)
+		}
 	}
 }
