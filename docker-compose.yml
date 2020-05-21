@@ -17,6 +17,10 @@ services:
   scrapper:
     image: polyse/web-scrapper
     restart: always
+    environment:
+      - RABBITMQ_URI=amqp://rabbitmq:5672
+      - SERVER=http://database:9000
+      - LOG_LEVEL=debug
     depends_on:
       - database
       - rabbitmq

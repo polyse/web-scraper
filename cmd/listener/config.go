@@ -7,7 +7,7 @@ import (
 )
 
 type config struct {
-	Server         string        `env:"Server" envDefault:"http://localhost:9000"`
+	Server         string        `env:"SERVER" envDefault:"http://localhost:9000"`
 	LogLevel       string        `env:"LOG_LEVEL" envDefault:"debug"`
 	RabbitmqUri    string        `env:"RABBITMQ_URI" envDefault:"amqp://localhost:5672"`
 	QueueName      string        `env:"RABBITMQ_QUEUE" envDefault:"sites-info"`
