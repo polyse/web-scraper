@@ -45,7 +45,7 @@ func initSDK(cfg *config) *sdk.DBClient {
 }
 
 func initConsumer(ctx context.Context, cfg *config, newC *sdk.DBClient) (*consumer.Consumer, func(), error) {
-	q, closer, err := rabbitmq.Connect(&rabbitmq.Config{
+	q, cl, err := rabbitmq.Connect(&rabbitmq.Config{
 		Uri:       cfg.RabbitmqUri,
 		QueueName: cfg.QueueName,
 	})
@@ -61,7 +61,7 @@ func initConsumer(ctx context.Context, cfg *config, newC *sdk.DBClient) (*consum
 	c := consumer.NewConsumer(ctx, q, in, newC)
 
 	return c, func() {
-		if err := closer(); err != nil {
+		if err := cl(); err != nil {
 			log.Error().Err(err)
 		}
 	}, err

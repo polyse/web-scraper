@@ -88,7 +88,7 @@ func (c *Consumer) listener(dataCh <-chan amqp.Delivery) {
 	messages := sdk.Documents{}
 	count := 0
 	zl.Debug().Msg("Start listen")
-	deliveries := []amqp.Delivery{}
+	var deliveries []amqp.Delivery
 	for {
 		select {
 		case d, ok := <-dataCh:

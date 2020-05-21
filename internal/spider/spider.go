@@ -54,16 +54,22 @@ func (m *Spider) collyScrapper(URL string) {
 		colly.UserAgent(surferua.New().String()),
 	)
 
-	co.Limit(&colly.LimitRule{
+	err := co.Limit(&colly.LimitRule{
 		Parallelism: 4,
 		RandomDelay: 10 * time.Second,
 	})
+	if err != nil {
+		zl.Warn().Err(err).Msg("Can't set limit")
+	}
 
 	co.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		link := e.Attr("href")
 		fullLink := e.Request.AbsoluteURL(link)
 		zl.Debug().Msgf("Find URL : %v", fullLink)
-		e.Request.Visit(fullLink)
+		err := e.Request.Visit(fullLink)
+		if err != nil {
+			zl.Warn().Err(err).Msgf("Can't visit page : %v", fullLink)
+		}
 	})
 
 	co.OnResponse(func(r *colly.Response) {
@@ -101,7 +107,10 @@ func (m *Spider) collyScrapper(URL string) {
 		zl.Debug().Err(err).Msg("Can't connect to URL")
 		return
 	})
-	co.Visit(URL)
+	err = co.Visit(URL)
+	if err != nil {
+		zl.Warn().Err(err).Msgf("Can't visit page : %v", URL)
+	}
 	co.Wait()
 }
 
