@@ -105,7 +105,6 @@ func (m *Spider) collyScrapper(URL string) {
 	})
 	co.OnError(func(r *colly.Response, err error) {
 		zl.Debug().Err(err).Msg("Can't connect to URL")
-		return
 	})
 	err = co.Visit(URL)
 	if err != nil {
