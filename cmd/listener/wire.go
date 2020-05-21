@@ -10,6 +10,6 @@ import (
 )
 
 func initApp(ctx context.Context, cfg *config) (*consumer.Consumer, func(), error) {
-	wire.Build(initConsumer)
+	wire.Build(initSDK, initConsumer)
 	return nil, nil, nil
 }

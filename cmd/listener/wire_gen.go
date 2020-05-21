@@ -13,7 +13,8 @@ import (
 // Injectors from wire.go:
 
 func initApp(ctx context.Context, cfg *config) (*consumer.Consumer, func(), error) {
-	consumerConsumer, cleanup, err := initConsumer(ctx, cfg)
+	dbClient := initSDK(cfg)
+	consumerConsumer, cleanup, err := initConsumer(ctx, cfg, dbClient)
 	if err != nil {
 		return nil, nil, err
 	}

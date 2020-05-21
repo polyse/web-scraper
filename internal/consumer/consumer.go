@@ -24,15 +24,23 @@ type Consumer struct {
 	Wg             *sync.WaitGroup
 }
 
-func NewConsumer(ctx context.Context, q *rabbitmq.Queue, url, collectionName, queueName string, numDoc int, timeout time.Duration, client *sdk.DBClient) *Consumer {
+type In struct {
+	Url            string
+	NumDoc         int
+	Timeout        time.Duration
+	CollectionName string
+	QueueName      string
+}
+
+func NewConsumer(ctx context.Context, q *rabbitmq.Queue, in In, client *sdk.DBClient) *Consumer {
 	return &Consumer{
 		q:              q,
-		url:            url,
-		numDoc:         numDoc,
-		timeout:        timeout,
+		url:            in.Url,
+		numDoc:         in.NumDoc,
+		timeout:        in.Timeout,
 		dbClient:       client,
-		collectionName: collectionName,
-		queueName:      queueName,
+		collectionName: in.CollectionName,
+		queueName:      in.QueueName,
 		ctx:            ctx,
 		Wg:             &sync.WaitGroup{},
 	}
@@ -95,17 +103,17 @@ func (c *Consumer) listener(dataCh <-chan amqp.Delivery) {
 				if err != nil {
 					zl.Warn().Err(err).Msg("Can't send nack")
 				}
-			} else {
-				count++
-				zl.Debug().Msgf("Got message %v", count)
-				messages.Documents = append(messages.Documents, message)
-				deliveries = append(deliveries, d)
-				if c.numDoc == count {
-					c.saveMessages(messages, deliveries)
-					count = 0
-					messages = sdk.Documents{}
-					deliveries = []amqp.Delivery{}
-				}
+				continue
+			}
+			count++
+			zl.Debug().Msgf("Got message %v", count)
+			messages.Documents = append(messages.Documents, message)
+			deliveries = append(deliveries, d)
+			if c.numDoc == count {
+				c.saveMessages(messages, deliveries)
+				count = 0
+				messages = sdk.Documents{}
+				deliveries = []amqp.Delivery{}
 			}
 		case <-time.After(c.timeout):
 			zl.Debug().Msg("Timeout end")

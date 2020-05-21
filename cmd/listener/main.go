@@ -40,14 +40,25 @@ func main() {
 	c.Wg.Wait()
 }
 
-func initConsumer(ctx context.Context, cfg *config) (*consumer.Consumer, func(), error) {
+func initSDK(cfg *config) *sdk.DBClient {
+	return sdk.NewDBClient(cfg.Server)
+}
+
+func initConsumer(ctx context.Context, cfg *config, newC *sdk.DBClient) (*consumer.Consumer, func(), error) {
 	q, closer, err := rabbitmq.Connect(&rabbitmq.Config{
 		Uri:       cfg.RabbitmqUri,
 		QueueName: cfg.QueueName,
 	})
 
-	newClient := sdk.NewDBClient(cfg.Server)
-	c := consumer.NewConsumer(ctx, q, cfg.RabbitmqUri, cfg.CollectionName, cfg.QueueName, cfg.NumDocument, cfg.Timeout, newClient)
+	in := consumer.In{
+		Url:            cfg.Server,
+		NumDoc:         cfg.NumDocument,
+		Timeout:        cfg.Timeout,
+		CollectionName: cfg.CollectionName,
+		QueueName:      cfg.QueueName,
+	}
+
+	c := consumer.NewConsumer(ctx, q, in, newC)
 
 	return c, func() {
 		if err := closer(); err != nil {

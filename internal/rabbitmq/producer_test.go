@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	sdk "github.com/polyse/database-sdk"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,7 +32,7 @@ func TestQueue_Produce(t *testing.T) {
 	wg.Add(1)
 	msgs, err := c.Ch.Consume("test", "", false, false, false, false, nil)
 	require.NoError(t, err, "Error on creating consumer")
-	act := make([]Message, 10)
+	act := make([]sdk.RawData, 10)
 	consumed := 0
 	quit := make(chan struct{})
 	go func() {
@@ -42,7 +44,7 @@ func TestQueue_Produce(t *testing.T) {
 				return
 			case m := <-msgs:
 				// get message
-				var message Message
+				var message sdk.RawData
 				err := json.Unmarshal(m.Body, &message)
 				if assert.NoError(t, err, "Error on consuming") {
 					t.Log("Consumed message:", message)
@@ -61,11 +63,11 @@ func TestQueue_Produce(t *testing.T) {
 	}()
 
 	// publish messages
-	exp := make([]Message, 10)
+	exp := make([]sdk.RawData, 10)
 	for i := 0; i < 10; i++ {
-		message := Message{
-			Source: Source{
-				Date:  nil,
+		message := sdk.RawData{
+			Source: sdk.Source{
+				Date:  time.Time{},
 				Title: fmt.Sprintf("Title %v", i),
 			},
 			Url:  fmt.Sprintf("Url %v", i),
