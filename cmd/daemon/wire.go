@@ -5,17 +5,16 @@ package main
 import (
 	"os"
 
-	"github.com/polyse/web-scraper/internal/rabbitmq"
-
 	"github.com/google/wire"
 	"github.com/polyse/web-scraper/internal/api"
+	"github.com/polyse/web-scraper/internal/rabbitmq"
 	"github.com/polyse/web-scraper/internal/spider"
 	"github.com/rs/zerolog"
 	zl "github.com/rs/zerolog/log"
 )
 
 func initApp() (*api.API, func(), error) {
-	wire.Build(newConfig, initSpider, initApi, initRabbitmq)
+	wire.Build(newConfig, initSpider, initRabbitmq, initApi)
 	return nil, nil, nil
 }
 

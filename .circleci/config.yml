@@ -58,8 +58,8 @@ workflows:
           filters:
             branches:
               only: master
-#          requires:
-#            - test
+      #          requires:
+      #            - test
       - deploy:
           filters:
             branches:

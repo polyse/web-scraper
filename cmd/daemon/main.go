@@ -6,7 +6,6 @@ import (
 
 func main() {
 	api, cleanup, err := initApp()
-
 	if err != nil {
 		zl.Fatal().Err(err).
 			Msg("Can't init api")
