@@ -37,11 +37,11 @@ type Message struct {
 func Connect(c *Config) (*Queue, func() error, error) {
 	conn, err := amqp.Dial(c.Uri)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open connection: %w", err)
+		return nil, nil, fmt.Errorf("failed to open rmq connection: %w", err)
 	}
 	ch, err := conn.Channel()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open channel: %w", err)
+		return nil, nil, fmt.Errorf("failed to open rmq channel: %w", err)
 	}
 	q, err := ch.QueueDeclare(c.QueueName, true, false, false, false, nil)
 	if err != nil {

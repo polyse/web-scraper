@@ -103,7 +103,14 @@ func (m *Spider) collyScrapper(URL string) {
 			return
 		}
 		content := d.Content()
-		m.DataCh <- rabbitmq.Message{Source: title, Url: URL, Data: content}
+		m.DataCh <- rabbitmq.Message{
+			Source: rabbitmq.Source{
+				Date:  nil,
+				Title: title,
+			},
+			Url:  URL,
+			Data: content,
+		}
 	})
 	co.OnError(func(r *colly.Response, err error) {
 		zl.Debug().Err(err).Msg("Can't connect to URL")
