@@ -36,10 +36,6 @@ jobs:
   build:
     docker:
       - image: circleci/buildpack-deps:stretch
-    environment:
-      DAEMON: daemon
-      LISTENER: listener
-      IMAGE_NAME: docker.pkg.github.com/polyse/web-scraper
     working_directory: ~/app
     steps:
       - checkout
