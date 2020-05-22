@@ -14,8 +14,8 @@ services:
       - LOG_LEVEL=debug
     ports:
       - 9000:9000
-  scrapper:
-    image: polyse/web-scrapper
+  listener:
+    image: docker.pkg.github.com/polyse/web-scraper/listener
     restart: always
     environment:
       - RABBITMQ_URI=amqp://rabbitmq:5672
@@ -24,3 +24,14 @@ services:
     depends_on:
       - database
       - rabbitmq
+  scrapper:
+    image: docker.pkg.github.com/polyse/web-scraper/daemon
+    restart: always
+    environment:
+      - RABBITMQ_URI=amqp://rabbitmq:5672
+      - LOG_LEVEL=debug
+      - LISTEN=0.0.0.0:9009
+    ports:
+      - 9009:9009
+    depends_on:
+      - listener

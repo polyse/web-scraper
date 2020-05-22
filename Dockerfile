@@ -1,16 +1,18 @@
 FROM golang:1.14 AS builder
-WORKDIR /go/src/github.com/polyse/web-scrapper
+WORKDIR /usr/src
 
+ARG MODE=daemon
 COPY go.mod .
 COPY go.sum .
 RUN go mod download
 
 COPY . .
-RUN GOOS=linux CGO_ENABLED=0 go build -installsuffix cgo -o app ./cmd/daemon
+RUN GOOS=linux CGO_ENABLED=0 go build -installsuffix cgo -o app ./cmd/${MODE}
+
 
 FROM alpine:latest
 RUN apk --no-cache add ca-certificates
+
 WORKDIR /app
-COPY --from=0 /go/src/github.com/polyse/web-scrapper .
-ENV LISTEN 0.0.0.0:7171
-ENTRYPOINT ["/app/app"]
+COPY --from=builder /usr/src .
+CMD ["/app/app"]

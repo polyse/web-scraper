@@ -14,22 +14,35 @@ jobs:
     docker:
       - image: circleci/buildpack-deps:stretch
     environment:
-      IMAGE_NAME: docker.pkg.github.com/polyse/web-scraper/daemon
+      DAEMON: daemon
+      LISTENER: listener
+      IMAGE_NAME: docker.pkg.github.com/polyse/web-scraper
     working_directory: ~/app
     steps:
       - checkout
       - setup_remote_docker
       - run:
-          name: Build Docker image
+          name: Build Daemon Docker image
           command: |
-            docker build -t $IMAGE_NAME:latest .
+            MODE=$DAEMON docker build -t $IMAGE_NAME/$DAEMON:latest .
       - run:
-          name: Push Docker Image
+          name: Push Daemon Docker Image
           command: |
             echo "$DOCKERHUB_PASS" | docker login docker.pkg.github.com --username "$DOCKERHUB_USERNAME" --password-stdin
-            docker tag $IMAGE_NAME:latest $IMAGE_NAME:$CIRCLE_SHA1
-            docker push $IMAGE_NAME:latest
-            docker push $IMAGE_NAME:$CIRCLE_SHA1
+            docker tag $IMAGE_NAME/$DAEMON:latest $IMAGE_NAME/$DAEMON:$CIRCLE_SHA1
+            docker push $IMAGE_NAME/$DAEMON:latest
+            docker push $IMAGE_NAME/$DAEMON:$CIRCLE_SHA1
+      - run:
+          name: Build Listener Docker image
+          command: |
+            MODE=$LISTENER docker build -t $IMAGE_NAME/$LISTENER:latest .
+      - run:
+          name: Push Listener Docker Image
+          command: |
+            echo "$DOCKERHUB_PASS" | docker login docker.pkg.github.com --username "$DOCKERHUB_USERNAME" --password-stdin
+            docker tag $IMAGE_NAME/$LISTENER:latest $IMAGE_NAME/$LISTENER:$CIRCLE_SHA1
+            docker push $IMAGE_NAME/$LISTENER:latest
+            docker push $IMAGE_NAME/$LISTENER:$CIRCLE_SHA1
   deploy:
     docker:
       - image: docker.pkg.github.com/polyse/deploy/deploy:latest
