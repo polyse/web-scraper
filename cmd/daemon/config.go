@@ -9,6 +9,8 @@ type config struct {
 	LogLevel    string `env:"LOG_LEVEL" envDefault:"debug"`
 	RabbitmqUri string `env:"RABBITMQ_URI" envDefault:"amqp://localhost:5672"`
 	QueueName   string `env:"RABBITMQ_QUEUE" envDefault:"sites-info"`
+	Auth        string `env:"AUTH_KEY" envDefault:"1234"`
+	RateLimit   int    `env:"RATE_LIMIT" envDefault:"10"`
 }
 
 func newConfig() (*config, error) {

@@ -26,11 +26,11 @@ func initSpider(cfg *config, queue *rabbitmq.Queue) (*spider.Spider, error) {
 	zerolog.SetGlobalLevel(logLevel)
 	zl.Logger = zl.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-	return spider.NewSpider(queue)
+	return spider.NewSpider(queue, cfg.RateLimit)
 }
 
 func initApi(cfg *config, mod *spider.Spider) (*api.API, func(), error) {
-	c, err := api.New(cfg.Listen, mod)
+	c, err := api.New(cfg.Listen, cfg.Auth, mod)
 	return c, func() {
 		c.Close()
 	}, err

@@ -21,11 +21,11 @@ func healthcheck(e echo.Context) error {
 
 func (a *API) collyHandler(e echo.Context) error {
 	domain := e.FormValue("domain")
-	go a.s.Colly(domain)
+	go a.s.StartSearch(domain)
 	return e.String(http.StatusAccepted, domain)
 }
 
-func New(addr string, s *spider.Spider) (*API, error) {
+func New(addr, auth string, s *spider.Spider) (*API, error) {
 	e := echo.New()
 	a := &API{
 		s:    s,
@@ -33,6 +33,9 @@ func New(addr string, s *spider.Spider) (*API, error) {
 		addr: addr,
 	}
 	e.Use(middleware.Logger())
+	e.Use(middleware.KeyAuth(func(key string, c echo.Context) (bool, error) {
+		return key == auth, nil
+	}))
 	e.GET("/healthcheck", healthcheck)
 	e.POST("/colly", a.collyHandler)
 	return a, nil
@@ -49,5 +52,6 @@ func (a *API) Start() {
 }
 
 func (a *API) Close() error {
+	close(a.s.DataCh)
 	return a.e.Close()
 }

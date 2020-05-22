@@ -15,6 +15,7 @@ require (
 	github.com/rs/zerolog v1.18.0
 	github.com/streadway/amqp v0.0.0-20200108173154-1c71cc93ed71
 	github.com/xlab/closer v0.0.0-20190328110542-03326addb7c2
+	go.uber.org/ratelimit v0.1.0
 	go.zoe.im/surferua v0.0.1
 	golang.org/x/net v0.0.0-20200506145744-7e3656a0809f // indirect
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
