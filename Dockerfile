@@ -7,6 +7,7 @@ COPY go.sum .
 RUN go mod download
 
 COPY . .
+RUN echo build mode: ${MODE}
 RUN GOOS=linux CGO_ENABLED=0 go build -installsuffix cgo -o app ./cmd/${MODE}
 
 

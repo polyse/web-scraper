@@ -13,7 +13,7 @@ commands:
       - run:
           name: Build << parameters.mode >> Docker image
           command: |
-            MODE=<< parameters.mode >> docker build -t << parameters.base-image >>/<< parameters.mode >>:latest .
+            docker build --build-arg MODE=<< parameters.mode >>  -t << parameters.base-image >>/<< parameters.mode >>:latest .
       - run:
           name: Push << parameters.mode >> Docker Image
           command: |
