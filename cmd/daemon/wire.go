@@ -30,7 +30,7 @@ func initSpider(cfg *config, queue *rabbitmq.Queue) (*spider.Spider, error) {
 }
 
 func initApi(cfg *config, mod *spider.Spider) (*api.API, func(), error) {
-	c, err := api.New(cfg.Listen, mod)
+	c, err := api.New(cfg.Listen, cfg.Auth, mod)
 	return c, func() {
 		c.Close()
 	}, err
