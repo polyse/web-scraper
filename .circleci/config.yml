@@ -13,14 +13,14 @@ commands:
       - run:
           name: Build Daemon Docker image
           command: |
-            MODE=<< parameters.mode >> docker build -t << parameters.mode >>/<< parameters.mode >>:latest .
+            MODE=<< parameters.mode >> docker build -t << parameters.base-image >>/<< parameters.mode >>:latest .
       - run:
           name: Push Daemon Docker Image
           command: |
             echo "$DOCKERHUB_PASS" | docker login docker.pkg.github.com --username "$DOCKERHUB_USERNAME" --password-stdin
-            docker tag << parameters.mode >>/<< parameters.mode >>:latest << parameters.mode >>/<< parameters.mode >>:$CIRCLE_SHA1
-            docker push << parameters.mode >>/<< parameters.mode >>:latest
-            docker push << parameters.mode >>/<< parameters.mode >>:$CIRCLE_SHA1
+            docker tag << parameters.base-image >>/<< parameters.mode >>:latest << parameters.base-image >>/<< parameters.mode >>:$CIRCLE_SHA1
+            docker push << parameters.base-image >>/<< parameters.mode >>:latest
+            docker push << parameters.base-image >>/<< parameters.mode >>:$CIRCLE_SHA1
 
 jobs:
   test:
