@@ -40,7 +40,7 @@ func main() {
 	c.Wg.Wait()
 }
 
-func initSDK(cfg *config) *sdk.DBClient {
+func initSDK(cfg *config) (*sdk.DBClient, error) {
 	return sdk.NewDBClient(cfg.Server)
 }
 
