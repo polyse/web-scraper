@@ -30,8 +30,8 @@ services:
     environment:
       - RABBITMQ_URI=amqp://rabbitmq:5672
       - LOG_LEVEL=debug
-      - LISTEN=0.0.0.0:9009
+      - LISTEN=0.0.0.0:7171
     ports:
-      - 9009:9009
+      - 7171:7171
     depends_on:
       - listener
