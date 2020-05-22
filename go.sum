@@ -54,8 +54,8 @@ github.com/mauidude/go-readability v0.0.0-20141216012317-2f30b1a346f1/go.mod h1:
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/polyse/database-sdk v1.0.0 h1:mFr8kiB97/tHE4TI2kHCMEWc2EoPfe0DIb2kThtcfQc=
-github.com/polyse/database-sdk v1.0.0/go.mod h1:1agMGl/FsjRzFW7ZAiFyi3ofcaIr6mlSn/8A5MYp4W8=
+github.com/polyse/database-sdk v1.0.1 h1:j4+E7ggDnj65srchi8mAvZn+nc3YYHdQpsPn6DBfmKg=
+github.com/polyse/database-sdk v1.0.1/go.mod h1:daXlSgVeh/FlNCH7HGLJpGlrZTvYLFN0/lNbXW/7Ktg=
 github.com/rs/xid v1.2.1/go.mod h1:+uKXf+4Djp6Md1KODXJxgGQPKngRmWyn10oCKFzNHOQ=
 github.com/rs/zerolog v1.18.0 h1:CbAm3kP2Tptby1i9sYy2MGRg0uxIN9cyDb59Ys7W8z8=
 github.com/rs/zerolog v1.18.0/go.mod h1:9nvC1axdVrAHcu/s9taAVfBuIdTZLVQmKQyvrUjF5+I=
