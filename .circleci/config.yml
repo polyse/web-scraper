@@ -11,11 +11,11 @@ commands:
         default: docker.pkg.github.com/polyse/web-scraper
     steps:
       - run:
-          name: Build Daemon Docker image
+          name: Build << parameters.mode >> Docker image
           command: |
             MODE=<< parameters.mode >> docker build -t << parameters.base-image >>/<< parameters.mode >>:latest .
       - run:
-          name: Push Daemon Docker Image
+          name: Push << parameters.mode >> Docker Image
           command: |
             echo "$DOCKERHUB_PASS" | docker login docker.pkg.github.com --username "$DOCKERHUB_USERNAME" --password-stdin
             docker tag << parameters.base-image >>/<< parameters.mode >>:latest << parameters.base-image >>/<< parameters.mode >>:$CIRCLE_SHA1
