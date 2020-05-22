@@ -17,26 +17,26 @@ import (
 	"go.zoe.im/surferua"
 )
 
-var rl = ratelimit.New(10)
-
 type Spider struct {
 	DataCh        chan sdk.RawData
 	currentDomain string
 	Queue         *rabbitmq.Queue
+	RateLimit     ratelimit.Limiter
 }
 
-func NewSpider(queue *rabbitmq.Queue) (*Spider, error) {
-	m := &Spider{
+func NewSpider(queue *rabbitmq.Queue, limit int) (*Spider, error) {
+	s := &Spider{
 		DataCh:        make(chan sdk.RawData),
 		currentDomain: "",
 		Queue:         queue,
+		RateLimit:     ratelimit.New(limit),
 	}
-	go m.Listener()
-	return m, nil
+	go s.Listener()
+	return s, nil
 }
 
-func (m *Spider) StartSearch(domain string) {
-	co := initScrapper(m.DataCh)
+func (s *Spider) StartSearch(domain string) {
+	co := s.initScrapper()
 	err := co.Visit(domain)
 	if err != nil {
 		zl.Warn().Err(err).Msgf("Can't visit page : %v", domain)
@@ -46,7 +46,7 @@ func (m *Spider) StartSearch(domain string) {
 	zl.Debug().Msgf("Finish %v", domain)
 }
 
-func initScrapper(dataCh chan sdk.RawData) *colly.Collector {
+func (s *Spider) initScrapper() *colly.Collector {
 	co := colly.NewCollector(
 		colly.Async(true),
 		colly.UserAgent(surferua.New().String()),
@@ -61,7 +61,7 @@ func initScrapper(dataCh chan sdk.RawData) *colly.Collector {
 		link := e.Attr("href")
 		fullLink := e.Request.AbsoluteURL(link)
 		zl.Debug().Msgf("Find URL : %v", fullLink)
-		rl.Take()
+		s.RateLimit.Take()
 		err := e.Request.Visit(fullLink)
 		if err != nil {
 			zl.Warn().Err(err).Msgf("Can't visit page : %v", fullLink)
@@ -97,7 +97,7 @@ func initScrapper(dataCh chan sdk.RawData) *colly.Collector {
 		if err != nil {
 			t = time.Time{}
 		}
-		dataCh <- sdk.RawData{
+		s.DataCh <- sdk.RawData{
 			Source: sdk.Source{
 				Date:  t,
 				Title: title,
@@ -112,9 +112,9 @@ func initScrapper(dataCh chan sdk.RawData) *colly.Collector {
 	return co
 }
 
-func (m *Spider) Listener() {
-	for info := range m.DataCh {
-		if err := m.Queue.Produce(&info); err != nil {
+func (s *Spider) Listener() {
+	for info := range s.DataCh {
+		if err := s.Queue.Produce(&info); err != nil {
 			zl.Error().Err(fmt.Errorf("Can't produce message for '%s': %s", info.Url, err))
 		}
 		zl.Debug().Msgf("Message for '%s' produced", info.Url)
