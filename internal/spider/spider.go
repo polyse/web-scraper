@@ -3,6 +3,7 @@ package spider
 import (
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -12,8 +13,11 @@ import (
 	"github.com/polyse/web-scraper/internal/extractor"
 	"github.com/polyse/web-scraper/internal/rabbitmq"
 	zl "github.com/rs/zerolog/log"
+	"go.uber.org/ratelimit"
 	"go.zoe.im/surferua"
 )
+
+var rl = ratelimit.New(10)
 
 type Spider struct {
 	DataCh        chan sdk.RawData
@@ -38,6 +42,7 @@ func (m *Spider) StartSearch(domain string) {
 		zl.Warn().Err(err).Msgf("Can't visit page : %v", domain)
 	}
 	co.Wait()
+	zl.Debug().Msgf("%s", co.String())
 	zl.Debug().Msgf("Finish %v", domain)
 }
 
@@ -47,8 +52,7 @@ func initScrapper(dataCh chan sdk.RawData) *colly.Collector {
 		colly.UserAgent(surferua.New().String()),
 	)
 	err := co.Limit(&colly.LimitRule{
-		Parallelism: 1,
-		Delay:       5 * time.Second,
+		Parallelism: runtime.NumCPU(),
 	})
 	if err != nil {
 		zl.Warn().Err(err).Msg("Can't set limit")
@@ -57,6 +61,7 @@ func initScrapper(dataCh chan sdk.RawData) *colly.Collector {
 		link := e.Attr("href")
 		fullLink := e.Request.AbsoluteURL(link)
 		zl.Debug().Msgf("Find URL : %v", fullLink)
+		rl.Take()
 		err := e.Request.Visit(fullLink)
 		if err != nil {
 			zl.Warn().Err(err).Msgf("Can't visit page : %v", fullLink)
@@ -102,7 +107,7 @@ func initScrapper(dataCh chan sdk.RawData) *colly.Collector {
 		}
 	})
 	co.OnError(func(r *colly.Response, err error) {
-		zl.Debug().Err(err).Msg("Can't connect to URL")
+		zl.Debug().Err(err).Msgf("Can't connect to URL %s", filepath.Join(r.Request.URL.Host, r.Request.URL.Path))
 	})
 	return co
 }
