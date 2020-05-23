@@ -141,7 +141,7 @@ func (s *Spider) initScrapper(ctx context.Context, u *url.URL) (*colly.Collector
 				Date:  t,
 				Title: title,
 			},
-			Url:  filepath.Join(r.Request.URL.Host, r.Request.URL.Path),
+			Url:  r.Request.URL.String(),
 			Data: content,
 		}
 	})
