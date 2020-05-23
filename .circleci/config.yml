@@ -16,7 +16,7 @@ commands:
           command: |
             echo "$DOCKERHUB_PASS" | docker login docker.pkg.github.com --username "$DOCKERHUB_USERNAME" --password-stdin
             docker push docker.pkg.github.com/polyse/web-scraper/<< parameters.mode >>:$CIRCLE_SHA1
-  push-latest:
+  build-latest:
     description: "Push latest"
     parameters:
       mode:
@@ -26,6 +26,8 @@ commands:
       - run:
           name: Push << parameters.mode >> Docker latest
           command: |
+            echo "$DOCKERHUB_PASS" | docker login docker.pkg.github.com --username "$DOCKERHUB_USERNAME" --password-stdin
+            docker push docker.pkg.github.com/polyse/web-scraper/<< parameters.mode >>:$CIRCLE_SHA1
             docker tag docker.pkg.github.com/polyse/web-scraper/<< parameters.mode >>:$CIRCLE_SHA1 docker.pkg.github.com/polyse/web-scraper/<< parameters.mode >>:latest
             docker push docker.pkg.github.com/polyse/web-scraper/<< parameters.mode >>:latest
 
@@ -84,6 +86,9 @@ workflows:
     jobs:
       - test
       - build:
+          filters:
+            branches:
+              ignore: master
           requires:
             - test
       - build-latest:
@@ -91,7 +96,7 @@ workflows:
             branches:
               only: master
           requires:
-            - build
+            - test
       - deploy:
           filters:
             branches:
