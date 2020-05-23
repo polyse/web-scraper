@@ -84,6 +84,7 @@ func initLocker(cfg *config) (*locker.Conn, func(), error) {
 	c, closer, err := locker.NewConn(&locker.Config{
 		Network: cfg.RedisNetwork,
 		Addr:    cfg.RedisAddr,
+		Pass:    cfg.RedisPass,
 		Size:    cfg.RedisSoze,
 	})
 	return c, func() {

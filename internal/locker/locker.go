@@ -9,6 +9,7 @@ import (
 type Config struct {
 	Network string
 	Addr    string
+	Pass    string
 	Size    int
 }
 
@@ -17,7 +18,15 @@ type Conn struct {
 }
 
 func NewConn(c *Config) (*Conn, func() error, error) {
-	pool, err := radix.NewPool(c.Network, c.Addr, c.Size)
+	connectionPath := func(network, addr string) (radix.Conn, error) {
+		var opts []radix.DialOpt
+		if c.Pass != "" {
+			opts = append(opts, radix.DialAuthPass(c.Pass))
+		}
+		return radix.Dial(network, addr, opts...)
+	}
+
+	pool, err := radix.NewPool(c.Network, c.Addr, c.Size, radix.PoolConnFunc(connectionPath))
 	return &Conn{p: pool}, func() error {
 		return pool.Close()
 	}, err
