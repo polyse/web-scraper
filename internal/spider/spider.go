@@ -51,14 +51,6 @@ func (m *Spider) Colly(domain string) {
 }
 
 func (m *Spider) collyScrapper(URL string) {
-	// check if url is locked
-	err := lock(m.l, URL)
-	if err != nil {
-		zl.Debug().Err(err).Str("URL", URL).Msg("Failed to lock url")
-		return
-	}
-	zl.Debug().Str("URL", URL).Msg("Url is locked")
-
 	zl.Debug().Msgf("%v", m.currentDomain)
 	co := colly.NewCollector(
 		colly.AllowedDomains(m.currentDomain),
