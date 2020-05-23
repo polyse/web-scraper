@@ -2,6 +2,7 @@ package spider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"path/filepath"
@@ -10,16 +11,20 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gocolly/colly/v2"
+
+	"github.com/polyse/web-scraper/internal/locker"
+
+	"github.com/polyse/web-scraper/internal/rabbitmq"
+
 	"github.com/PuerkitoBio/goquery"
 	"github.com/araddon/dateparse"
-	"github.com/gocolly/colly/v2"
 	sdk "github.com/polyse/database-sdk"
 	zl "github.com/rs/zerolog/log"
 	"go.uber.org/ratelimit"
 	"go.zoe.im/surferua"
 
 	"github.com/polyse/web-scraper/internal/extractor"
-	"github.com/polyse/web-scraper/internal/rabbitmq"
 )
 
 type Spider struct {
@@ -28,9 +33,10 @@ type Spider struct {
 	Delay, RandomDelay time.Duration
 	userAgentMutex     *sync.RWMutex
 	dataCh             chan sdk.RawData
+	locker             *locker.Conn
 }
 
-func NewSpider(queue *rabbitmq.Queue, limit int, delay, randomDelay time.Duration) (*Spider, error) {
+func NewSpider(queue *rabbitmq.Queue, limit int, delay, randomDelay time.Duration, locker *locker.Conn) (*Spider, error) {
 	s := &Spider{
 		Queue:          queue,
 		RateLimit:      ratelimit.New(limit),
@@ -38,6 +44,7 @@ func NewSpider(queue *rabbitmq.Queue, limit int, delay, randomDelay time.Duratio
 		RandomDelay:    randomDelay,
 		userAgentMutex: &sync.RWMutex{},
 		dataCh:         make(chan sdk.RawData),
+		locker:         locker,
 	}
 	go s.Listener()
 	return s, nil
@@ -99,9 +106,16 @@ func (s *Spider) initScrapper(ctx context.Context, u *url.URL) (*colly.Collector
 		link := e.Attr("href")
 		fullLink := e.Request.AbsoluteURL(link)
 		zl.Debug().Msgf("Find URL : %v", fullLink)
+		// check if url is locked
+		err := lock(s.locker, fullLink)
+		if err != nil {
+			zl.Debug().Err(err).Str("URL", fullLink).Msg("Failed to lock url")
+			return
+		}
+		zl.Debug().Str("URL", fullLink).Msg("Url is locked")
 		s.RateLimit.Take()
 		s.userAgentMutex.RLock()
-		err := e.Request.Visit(fullLink)
+		err = e.Request.Visit(fullLink)
 		s.userAgentMutex.RUnlock()
 		if err == colly.ErrAlreadyVisited || err == colly.ErrForbiddenDomain {
 			return
@@ -122,6 +136,7 @@ func (s *Spider) initScrapper(ctx context.Context, u *url.URL) (*colly.Collector
 		if err != nil {
 			zl.Debug().Err(err).
 				Msg("Can't load html text")
+			unlock(s.locker, r.Request.URL.String())
 			return
 		}
 
@@ -131,6 +146,7 @@ func (s *Spider) initScrapper(ctx context.Context, u *url.URL) (*colly.Collector
 		actual, err := extractor.ExtractContentFromHTML(payload)
 		if err != nil {
 			zl.Debug().Err(err).Msgf("Can't parse")
+			unlock(s.locker, r.Request.URL.String())
 			return
 		}
 		content := extractor.Clean(actual)
@@ -148,6 +164,7 @@ func (s *Spider) initScrapper(ctx context.Context, u *url.URL) (*colly.Collector
 	})
 	co.OnError(func(r *colly.Response, err error) {
 		zl.Debug().Err(err).Msgf("Can't connect to URL %s", filepath.Join(r.Request.URL.Host, r.Request.URL.Path))
+		unlock(s.locker, r.Request.URL.String())
 	})
 	return co, nil
 }
@@ -190,4 +207,28 @@ func (s *Spider) Listener() {
 
 func (s *Spider) Close() {
 	close(s.dataCh)
+}
+
+// Try to lock url
+func lock(l *locker.Conn, url string) error {
+	locked, err := l.TryLock(url)
+	if err != nil {
+		return fmt.Errorf("failed to lock url: %w", err)
+	}
+	if !locked {
+		return errors.New("url is locked")
+	}
+	return nil
+}
+
+// Try to unlock url
+func unlock(l *locker.Conn, url string) {
+	unlocked, err := l.Unlock(url)
+	if err != nil {
+		err := fmt.Errorf("failed to unlock url: %w", err)
+		zl.Debug().Err(err).Str("URL", url).Msg("Failed to unlock url")
+	}
+	if !unlocked {
+		zl.Debug().Str("URL", url).Msg("Link wasn't locked")
+	}
 }

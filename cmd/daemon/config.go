@@ -15,6 +15,10 @@ type config struct {
 	RateLimit       int           `env:"RATE_LIMIT" envDefault:"10"`
 	SiteDelay       time.Duration `env:"SITE_DELAY" envDefault:"1s"`
 	SiteRandomDelay time.Duration `env:"SITE_RANDOM_DELAY" envDefault:"3s"`
+	RedisNetwork    string        `env:"REDIS_NETWORK" envDefault:"tcp"`
+	RedisAddr       string        `env:"REDIS_ADDR" envDefault:":6379"`
+	RedisPass       string        `env:"REDIS_PASS" envDefault:""`
+	RedisSoze       int           `env:"REDIS_CONNECTION_POOL" envDefault:"1"`
 }
 
 func initConfig() (*config, error) {

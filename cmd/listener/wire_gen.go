@@ -7,6 +7,7 @@ package main
 
 import (
 	"context"
+
 	"github.com/polyse/web-scraper/internal/consumer"
 )
 

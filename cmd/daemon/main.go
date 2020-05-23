@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 
+	"github.com/polyse/web-scraper/internal/locker"
+
 	"github.com/polyse/web-scraper/internal/api"
 	"github.com/polyse/web-scraper/internal/rabbitmq"
 	"github.com/polyse/web-scraper/internal/spider"
@@ -51,8 +53,8 @@ func initLogger(cfg *config) error {
 	return nil
 }
 
-func initSpider(cfg *config, queue *rabbitmq.Queue) (*spider.Spider, func(), error) {
-	s, err := spider.NewSpider(queue, cfg.RateLimit, cfg.SiteDelay, cfg.SiteRandomDelay)
+func initSpider(cfg *config, queue *rabbitmq.Queue, locker *locker.Conn) (*spider.Spider, func(), error) {
+	s, err := spider.NewSpider(queue, cfg.RateLimit, cfg.SiteDelay, cfg.SiteRandomDelay, locker)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -74,6 +76,21 @@ func initRabbitmq(cfg *config) (*rabbitmq.Queue, func(), error) {
 	return q, func() {
 		if err := closer(); err != nil {
 			log.Debug().Msgf("Error on close queue: %s", err)
+		}
+	}, err
+}
+
+func initLocker(cfg *config) (*locker.Conn, func(), error) {
+	c, closer, err := locker.NewConn(&locker.Config{
+		Network: cfg.RedisNetwork,
+		Addr:    cfg.RedisAddr,
+		Pass:    cfg.RedisPass,
+		Size:    cfg.RedisSoze,
+	})
+	return c, func() {
+		err := closer()
+		if err != nil {
+			log.Debug().Msgf("Error on close locker: %s", err)
 		}
 	}, err
 }

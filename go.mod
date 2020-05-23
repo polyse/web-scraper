@@ -11,6 +11,7 @@ require (
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/labstack/echo/v4 v4.1.16
 	github.com/mauidude/go-readability v0.0.0-20141216012317-2f30b1a346f1
+	github.com/mediocregopher/radix/v3 v3.5.1
 	github.com/polyse/database-sdk v1.0.2
 	github.com/rs/zerolog v1.18.0
 	github.com/streadway/amqp v0.0.0-20200108173154-1c71cc93ed71
