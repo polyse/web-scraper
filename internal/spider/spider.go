@@ -19,18 +19,21 @@ import (
 )
 
 type Spider struct {
-	DataCh        chan sdk.RawData
-	currentDomain string
-	Queue         *rabbitmq.Queue
-	RateLimit     ratelimit.Limiter
+	DataCh             chan sdk.RawData
+	currentDomain      string
+	Queue              *rabbitmq.Queue
+	RateLimit          ratelimit.Limiter
+	Delay, RandomDelay time.Duration
 }
 
-func NewSpider(queue *rabbitmq.Queue, limit int) (*Spider, error) {
+func NewSpider(queue *rabbitmq.Queue, limit int, delay, randomDelay time.Duration) (*Spider, error) {
 	s := &Spider{
 		DataCh:        make(chan sdk.RawData),
 		currentDomain: "",
 		Queue:         queue,
 		RateLimit:     ratelimit.New(limit),
+		Delay:         delay,
+		RandomDelay:   randomDelay,
 	}
 	go s.Listener()
 	return s, nil
@@ -58,16 +61,16 @@ func (s *Spider) StartSearch(startUrl string) {
 	zl.Debug().Msgf("Finish %v", startUrl)
 }
 
-func (s *Spider) initScrapper(domain *url.URL) *colly.Collector {
+func (s *Spider) initScrapper(u *url.URL) *colly.Collector {
 	co := colly.NewCollector(
 		colly.Async(true),
 		colly.UserAgent(surferua.New().String()),
-		colly.AllowedDomains(domain.Host),
+		colly.AllowedDomains(u.Host),
 	)
 	err := co.Limit(&colly.LimitRule{
 		Parallelism: runtime.NumCPU(),
-		Delay:       time.Second,
-		RandomDelay: 3 * time.Second,
+		Delay:       s.Delay,
+		RandomDelay: s.RandomDelay,
 	})
 	if err != nil {
 		zl.Warn().Err(err).Msg("Can't set limit")

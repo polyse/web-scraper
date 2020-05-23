@@ -44,7 +44,7 @@ func initLogger(cfg *config) error {
 }
 
 func initSpider(cfg *config, queue *rabbitmq.Queue) (*spider.Spider, error) {
-	return spider.NewSpider(queue, cfg.RateLimit)
+	return spider.NewSpider(queue, cfg.RateLimit, cfg.SiteDelay, cfg.SiteRandomDelay)
 }
 
 func initApi(cfg *config, mod *spider.Spider) (*api.API, func(), error) {
