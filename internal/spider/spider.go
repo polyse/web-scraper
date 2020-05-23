@@ -126,6 +126,7 @@ func (s *Spider) initScrapper(ctx context.Context, u *url.URL) (*colly.Collector
 		}
 
 		title := doc.Find("Title").Text()
+		title = strings.TrimSpace(title)
 
 		actual, err := extractor.ExtractContentFromHTML(payload)
 		if err != nil {
