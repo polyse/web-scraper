@@ -165,7 +165,6 @@ func (s *Spider) initScrapper(ctx context.Context, u *url.URL) (*colly.Collector
 	co.OnError(func(r *colly.Response, err error) {
 		zl.Debug().Err(err).Msgf("Can't connect to URL %s", filepath.Join(r.Request.URL.Host, r.Request.URL.Path))
 		unlock(s.locker, r.Request.URL.String())
-		return
 	})
 	return co, nil
 }
