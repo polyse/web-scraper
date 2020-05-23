@@ -71,8 +71,11 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Deploy
+          name: Deploy daemon
           command: COMMIT_SHA=$CIRCLE_SHA1 SERVICE=web-scraper-daemon /deploy/deploy.sh
+      - run:
+          name: Deploy listener
+          command: COMMIT_SHA=$CIRCLE_SHA1 SERVICE=web-scraper-listener /deploy/deploy.sh
 
 workflows:
   version: 2
