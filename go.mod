@@ -4,6 +4,7 @@ go 1.14
 
 require (
 	github.com/PuerkitoBio/goquery v1.5.1
+	github.com/araddon/dateparse v0.0.0-20200409225146-d820a6159ab1
 	github.com/caarlos0/env/v6 v6.2.2
 	github.com/gocolly/colly/v2 v2.0.1
 	github.com/google/wire v0.4.0

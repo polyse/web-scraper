@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/araddon/dateparse"
 	"github.com/gocolly/colly/v2"
 	sdk "github.com/polyse/database-sdk"
 	zl "github.com/rs/zerolog/log"
@@ -151,9 +152,10 @@ func (s *Spider) initScrapper(ctx context.Context, u *url.URL) (*colly.Collector
 }
 
 func (s *Spider) searchDate(r *colly.Response, doc *goquery.Document) time.Time {
+	yearBefore := time.Now().Add(time.Hour * 24 * -365)
 	for _, meta := range doc.Find("meta").Nodes {
 		for _, attr := range meta.Attr {
-			if t, err := time.Parse(time.RFC1123, attr.Val); err == nil {
+			if t, err := dateparse.ParseAny(attr.Val); err == nil && t.After(yearBefore) {
 				return t
 			}
 		}
@@ -178,7 +180,7 @@ func (s *Spider) Listener() {
 		if err := s.Queue.Produce(&info); err != nil {
 			zl.Error().Err(fmt.Errorf("can't produce message for '%s': %s", info.Url, err))
 		}
-		logger := zl.With().Str("Title", info.Source.Title).Str("URL", info.Url).Logger()
+		logger := zl.With().Str("Title", info.Source.Title).Str("URL", info.Url).Time("Date", info.Source.Date).Logger()
 		logger.Info().Msgf("Document sent")
 		logger.Debug().Str("Content", info.Data).Msg("Document content sent")
 
