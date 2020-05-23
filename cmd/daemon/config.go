@@ -13,7 +13,7 @@ type config struct {
 	RateLimit   int    `env:"RATE_LIMIT" envDefault:"10"`
 }
 
-func newConfig() (*config, error) {
+func initConfig() (*config, error) {
 	cfg := &config{}
 
 	if err := env.Parse(cfg); err != nil {

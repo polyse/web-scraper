@@ -2,6 +2,7 @@ package spider
 
 import (
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -35,24 +36,38 @@ func NewSpider(queue *rabbitmq.Queue, limit int) (*Spider, error) {
 	return s, nil
 }
 
-func (s *Spider) StartSearch(domain string) {
-	co := s.initScrapper()
-	err := co.Visit(domain)
+func (s *Spider) StartSearch(startUrl string) {
+	u, err := url.Parse(startUrl)
 	if err != nil {
-		zl.Warn().Err(err).Msgf("Can't visit page : %v", domain)
+		zl.Warn().Err(err).Msgf("Can't visit page : %v", startUrl)
+		return
+	}
+	co := s.initScrapper(u)
+	err = co.Visit(startUrl)
+	go func() {
+		for {
+			<-time.After(5 * time.Second)
+			co.UserAgent = surferua.New().String()
+		}
+	}()
+	if err != nil {
+		zl.Warn().Err(err).Msgf("Can't visit page : %v", startUrl)
 	}
 	co.Wait()
 	zl.Debug().Msgf("%s", co.String())
-	zl.Debug().Msgf("Finish %v", domain)
+	zl.Debug().Msgf("Finish %v", startUrl)
 }
 
-func (s *Spider) initScrapper() *colly.Collector {
+func (s *Spider) initScrapper(domain *url.URL) *colly.Collector {
 	co := colly.NewCollector(
 		colly.Async(true),
 		colly.UserAgent(surferua.New().String()),
+		colly.AllowedDomains(domain.Host),
 	)
 	err := co.Limit(&colly.LimitRule{
 		Parallelism: runtime.NumCPU(),
+		Delay:       time.Second,
+		RandomDelay: 3 * time.Second,
 	})
 	if err != nil {
 		zl.Warn().Err(err).Msg("Can't set limit")
@@ -63,6 +78,9 @@ func (s *Spider) initScrapper() *colly.Collector {
 		zl.Debug().Msgf("Find URL : %v", fullLink)
 		s.RateLimit.Take()
 		err := e.Request.Visit(fullLink)
+		if err == colly.ErrAlreadyVisited || err == colly.ErrForbiddenDomain {
+			return
+		}
 		if err != nil {
 			zl.Warn().Err(err).Msgf("Can't visit page : %v", fullLink)
 		}
@@ -117,6 +135,6 @@ func (s *Spider) Listener() {
 		if err := s.Queue.Produce(&info); err != nil {
 			zl.Error().Err(fmt.Errorf("Can't produce message for '%s': %s", info.Url, err))
 		}
-		zl.Debug().Msgf("Message for '%s' produced", info.Url)
+		zl.Info().Str("Title", info.Title).Str("URL", info.Url).Msgf("Document sent")
 	}
 }

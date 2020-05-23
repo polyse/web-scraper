@@ -41,14 +41,10 @@ func New(addr, auth string, s *spider.Spider) (*API, error) {
 	return a, nil
 }
 
-func (a *API) Start() {
+func (a *API) Start() error {
 	zl.Debug().
 		Msgf("listening on %v", a.addr)
-	err := a.e.Start(a.addr)
-	if err != nil {
-		zl.Fatal().Err(err).
-			Msg("Can't start service")
-	}
+	return a.e.Start(a.addr)
 }
 
 func (a *API) Close() error {

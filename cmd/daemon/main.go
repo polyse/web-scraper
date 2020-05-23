@@ -1,15 +1,68 @@
 package main
 
 import (
-	zl "github.com/rs/zerolog/log"
+	"strings"
+
+	"github.com/polyse/web-scraper/internal/api"
+	"github.com/polyse/web-scraper/internal/rabbitmq"
+	"github.com/polyse/web-scraper/internal/spider"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"github.com/xlab/closer"
 )
 
 func main() {
-	api, cleanup, err := initApp()
+	defer closer.Close()
+
+	cfg, err := initConfig()
 	if err != nil {
-		zl.Fatal().Err(err).
+		log.Fatal().Err(err).Msg("Can not init config")
+	}
+
+	if err := initLogger(cfg); err != nil {
+		log.Fatal().Err(err).Msg("Can not init logger")
+	}
+
+	api, cleanup, err := initApp(cfg)
+	if err != nil {
+		log.Fatal().Err(err).
 			Msg("Can't init api")
 	}
-	defer cleanup()
-	api.Start()
+	closer.Bind(cleanup)
+	if err := api.Start(); err != nil {
+		log.Fatal().Err(err).Msg("Can not start app")
+	}
+}
+
+func initLogger(cfg *config) error {
+	logLevel, err := zerolog.ParseLevel(strings.ToLower(cfg.LogLevel))
+	if err != nil {
+		return err
+	}
+	zerolog.SetGlobalLevel(logLevel)
+	return nil
+}
+
+func initSpider(cfg *config, queue *rabbitmq.Queue) (*spider.Spider, error) {
+	return spider.NewSpider(queue, cfg.RateLimit)
+}
+
+func initApi(cfg *config, mod *spider.Spider) (*api.API, func(), error) {
+	c, err := api.New(cfg.Listen, cfg.Auth, mod)
+	return c, func() {
+		c.Close()
+	}, err
+}
+
+func initRabbitmq(cfg *config) (*rabbitmq.Queue, func(), error) {
+	q, closer, err := rabbitmq.Connect(&rabbitmq.Config{
+		Uri:       cfg.RabbitmqUri,
+		QueueName: cfg.QueueName,
+	})
+	return q, func() {
+		err := closer()
+		if err != nil {
+			log.Debug().Msgf("Error on close queue: %s", err)
+		}
+	}, err
 }
