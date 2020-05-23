@@ -1,0 +1,110 @@
+version: 2.1
+commands:
+  build-image:
+    description: "Build and publish docker image"
+    parameters:
+      mode:
+        type: string
+        default: daemon
+    steps:
+      - run:
+          name: Build << parameters.mode >> Docker image
+          command: |
+            docker build --build-arg MODE=<< parameters.mode >>  -t docker.pkg.github.com/polyse/web-scraper/<< parameters.mode >>:$CIRCLE_SHA1 .
+      - run:
+          name: Push << parameters.mode >> Docker image
+          command: |
+            echo "$DOCKERHUB_PASS" | docker login docker.pkg.github.com --username "$DOCKERHUB_USERNAME" --password-stdin
+            docker push docker.pkg.github.com/polyse/web-scraper/<< parameters.mode >>:$CIRCLE_SHA1
+  build-latest:
+    description: "Push latest"
+    parameters:
+      mode:
+        type: string
+        default: daemon
+    steps:
+      - run:
+          name: Build << parameters.mode >> Docker image
+          command: |
+            docker build --build-arg MODE=<< parameters.mode >>  -t docker.pkg.github.com/polyse/web-scraper/<< parameters.mode >>:$CIRCLE_SHA1 .
+      - run:
+          name: Push << parameters.mode >> Docker latest
+          command: |
+            echo "$DOCKERHUB_PASS" | docker login docker.pkg.github.com --username "$DOCKERHUB_USERNAME" --password-stdin
+            docker push docker.pkg.github.com/polyse/web-scraper/<< parameters.mode >>:$CIRCLE_SHA1
+            docker tag docker.pkg.github.com/polyse/web-scraper/<< parameters.mode >>:$CIRCLE_SHA1 docker.pkg.github.com/polyse/web-scraper/<< parameters.mode >>:latest
+            docker push docker.pkg.github.com/polyse/web-scraper/<< parameters.mode >>:latest
+
+jobs:
+  test:
+    docker:
+      - image: golang:1.14
+    working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
+    steps:
+      - checkout
+      - run: go get -v -t -d ./...
+      - run: go test -v ./...
+      - run: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.27.0
+      - run: golangci-lint run
+  build:
+    docker:
+      - image: circleci/buildpack-deps:stretch
+    working_directory: ~/app
+    steps:
+      - checkout
+      - setup_remote_docker
+      - build-image
+      - build-image:
+          mode: listener
+  build-latest:
+    docker:
+      - image: circleci/buildpack-deps:stretch
+    working_directory: ~/app
+    steps:
+      - checkout
+      - setup_remote_docker
+      - build-latest
+      - build-latest:
+          mode: listener
+  deploy:
+    docker:
+      - image: docker.pkg.github.com/polyse/deploy/deploy:latest
+        auth:
+          username: $DOCKERHUB_USERNAME
+          password: $DOCKERHUB_PASS
+        environment:
+          COMMIT_SHA: $CIRCLE_SHA1
+          KUBECONFIG: $KUBECONFIG
+    working_directory: ~/app
+    steps:
+      - checkout
+      - run:
+          name: Deploy daemon
+          command: COMMIT_SHA=$CIRCLE_SHA1 SERVICE=web-scraper-daemon /deploy/deploy.sh
+      - run:
+          name: Deploy listener
+          command: COMMIT_SHA=$CIRCLE_SHA1 SERVICE=web-scraper-listener /deploy/deploy.sh
+
+workflows:
+  version: 2
+  build-deploy-master:
+    jobs:
+      - test
+      - build:
+          filters:
+            branches:
+              ignore: master
+          requires:
+            - test
+      - build-latest:
+          filters:
+            branches:
+              only: master
+          requires:
+            - test
+      - deploy:
+          filters:
+            branches:
+              only: master
+          requires:
+            - build-latest

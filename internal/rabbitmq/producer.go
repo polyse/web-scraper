@@ -3,8 +3,8 @@ package rabbitmq
 import (
 	"encoding/json"
 	"fmt"
-	"time"
 
+	sdk "github.com/polyse/database-sdk"
 	"github.com/streadway/amqp"
 )
 
@@ -17,31 +17,18 @@ type Config struct {
 // Queue holds a connection and opened channel with queue
 type Queue struct {
 	conn *amqp.Connection
-	ch   *amqp.Channel
+	Ch   *amqp.Channel
 	q    amqp.Queue
-}
-
-// Source structure for domain\article\site\source description.
-type Source struct {
-	Date  *time.Time `json:"date,omitempty"` // without pointer "omitempty" won't work
-	Title string     `json:"title"`
-}
-
-// Message for producing to queue
-type Message struct {
-	Source
-	Url  string `json:"url"`
-	Data string `json:"data"`
 }
 
 func Connect(c *Config) (*Queue, func() error, error) {
 	conn, err := amqp.Dial(c.Uri)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open connection: %w", err)
+		return nil, nil, fmt.Errorf("failed to open rmq connection: %w", err)
 	}
 	ch, err := conn.Channel()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open channel: %w", err)
+		return nil, nil, fmt.Errorf("failed to open rmq channel: %w", err)
 	}
 	q, err := ch.QueueDeclare(c.QueueName, true, false, false, false, nil)
 	if err != nil {
@@ -49,18 +36,18 @@ func Connect(c *Config) (*Queue, func() error, error) {
 	}
 	queue := &Queue{
 		conn: conn,
-		ch:   ch,
+		Ch:   ch,
 		q:    q,
 	}
 	return queue, queue.close, nil
 }
 
-func (q *Queue) Produce(m *Message) error {
-	body, err := json.Marshal(&m)
+func (q *Queue) Produce(rawData *sdk.RawData) error {
+	body, err := json.Marshal(&rawData)
 	if err != nil {
 		return fmt.Errorf("failed to marshal message: %w", err)
 	}
-	err = q.ch.Publish("", q.q.Name, false, false, amqp.Publishing{
+	err = q.Ch.Publish("", q.q.Name, false, false, amqp.Publishing{
 		ContentType:     "application/json",
 		ContentEncoding: "UTF-8",
 		Body:            body,
@@ -72,7 +59,7 @@ func (q *Queue) Produce(m *Message) error {
 }
 
 func (q *Queue) close() error {
-	err := q.ch.Close()
+	err := q.Ch.Close()
 	if err != nil {
 		return fmt.Errorf("failed to close channel: %w", err)
 	}
