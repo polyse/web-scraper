@@ -24,6 +24,10 @@ commands:
         default: daemon
     steps:
       - run:
+          name: Build << parameters.mode >> Docker image
+          command: |
+            docker build --build-arg MODE=<< parameters.mode >>  -t docker.pkg.github.com/polyse/web-scraper/<< parameters.mode >>:$CIRCLE_SHA1 .
+      - run:
           name: Push << parameters.mode >> Docker latest
           command: |
             echo "$DOCKERHUB_PASS" | docker login docker.pkg.github.com --username "$DOCKERHUB_USERNAME" --password-stdin
