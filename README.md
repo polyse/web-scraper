@@ -27,7 +27,7 @@ go get github.com/polyse/web-scrapper
     ```
 6. Send POST-message with auth Bearer token like :
     ```bash
-        localhost:7171/colly?domain=http://go-colly.org
+        localhost:7171/start?url=http://go-colly.org
     ```
 7. Enjoy results.
 

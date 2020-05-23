@@ -6,27 +6,30 @@
 package main
 
 import (
+	"context"
 	"github.com/polyse/web-scraper/internal/api"
 )
 
 // Injectors from wire.go:
 
-func initApp(cfg *config) (*api.API, func(), error) {
+func initApp(ctx context.Context, cfg *config) (*api.API, func(), error) {
 	queue, cleanup, err := initRabbitmq(cfg)
 	if err != nil {
 		return nil, nil, err
 	}
-	spider, err := initSpider(cfg, queue)
+	spider, cleanup2, err := initSpider(cfg, queue)
 	if err != nil {
 		cleanup()
 		return nil, nil, err
 	}
-	apiAPI, cleanup2, err := initApi(cfg, spider)
+	apiAPI, cleanup3, err := initApi(ctx, cfg, spider)
 	if err != nil {
+		cleanup2()
 		cleanup()
 		return nil, nil, err
 	}
 	return apiAPI, func() {
+		cleanup3()
 		cleanup2()
 		cleanup()
 	}, nil

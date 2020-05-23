@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"strings"
 
 	"github.com/polyse/web-scraper/internal/api"
@@ -14,6 +15,10 @@ import (
 func main() {
 	defer closer.Close()
 
+	closer.Bind(func() {
+		log.Info().Msg("shutdown")
+	})
+
 	cfg, err := initConfig()
 	if err != nil {
 		log.Fatal().Err(err).Msg("Can not init config")
@@ -23,10 +28,13 @@ func main() {
 		log.Fatal().Err(err).Msg("Can not init logger")
 	}
 
-	api, cleanup, err := initApp(cfg)
+	ctx, cancelCtx := context.WithCancel(context.Background())
+	closer.Bind(cancelCtx)
+
+	api, cleanup, err := initApp(ctx, cfg)
 	if err != nil {
 		log.Fatal().Err(err).
-			Msg("Can't init api")
+			Msg("Can't init app")
 	}
 	closer.Bind(cleanup)
 	if err := api.Start(); err != nil {
@@ -43,12 +51,16 @@ func initLogger(cfg *config) error {
 	return nil
 }
 
-func initSpider(cfg *config, queue *rabbitmq.Queue) (*spider.Spider, error) {
-	return spider.NewSpider(queue, cfg.RateLimit, cfg.SiteDelay, cfg.SiteRandomDelay)
+func initSpider(cfg *config, queue *rabbitmq.Queue) (*spider.Spider, func(), error) {
+	s, err := spider.NewSpider(queue, cfg.RateLimit, cfg.SiteDelay, cfg.SiteRandomDelay)
+	if err != nil {
+		return nil, nil, err
+	}
+	return s, s.Close, nil
 }
 
-func initApi(cfg *config, mod *spider.Spider) (*api.API, func(), error) {
-	c, err := api.New(cfg.Listen, cfg.Auth, mod)
+func initApi(ctx context.Context, cfg *config, mod *spider.Spider) (*api.API, func(), error) {
+	c, err := api.New(ctx, cfg.Listen, cfg.Auth, mod)
 	return c, func() {
 		c.Close()
 	}, err
@@ -60,8 +72,7 @@ func initRabbitmq(cfg *config) (*rabbitmq.Queue, func(), error) {
 		QueueName: cfg.QueueName,
 	})
 	return q, func() {
-		err := closer()
-		if err != nil {
+		if err := closer(); err != nil {
 			log.Debug().Msgf("Error on close queue: %s", err)
 		}
 	}, err

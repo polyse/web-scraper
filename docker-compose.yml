@@ -22,6 +22,7 @@ services:
       - RABBITMQ_URI=amqp://user:passwd@rabbitmq:5672
       - SERVER=http://database:9000
       - LOG_LEVEL=debug
+      - NUM_DOC=20
     depends_on:
       - database
       - rabbitmq
