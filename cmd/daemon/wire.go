@@ -54,9 +54,9 @@ func initRabbitmq(cfg *config) (*rabbitmq.Queue, func(), error) {
 
 func initLocker(cfg *config) (*locker.Conn, func(), error) {
 	c, closer, err := locker.NewConn(&locker.Config{
-		Network: cfg.LockerNetwork,
-		Addr:    cfg.LockerAddr,
-		Size:    cfg.LockerSize,
+		Network: cfg.RedisNetwork,
+		Addr:    cfg.RedisAddr,
+		Size:    cfg.RedisSoze,
 	})
 	return c, func() {
 		err := closer()
