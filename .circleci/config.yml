@@ -58,8 +58,8 @@ jobs:
     working_directory: ~/app
     steps:
       - setup_remote_docker
-      - push-latest
-      - push-latest:
+      - build-latest
+      - build-latest:
           mode: listener
   deploy:
     docker:
