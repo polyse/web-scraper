@@ -44,14 +44,14 @@ func NewSpider(queue *rabbitmq.Queue, limit int, delay, randomDelay time.Duratio
 }
 
 func (s *Spider) Scrap(ctx context.Context, startUrl *url.URL) error {
-	subCtx, cancel := context.WithCancel(ctx)
-	co, err := s.initScrapper(subCtx, startUrl)
+	co, err := s.initScrapper(ctx, startUrl)
 	if err != nil {
 		return err
 	}
 	if err := co.Visit(startUrl.String()); err != nil {
 		return err
 	}
+	subCtx, cancel := context.WithCancel(ctx)
 	go func() {
 		for {
 			select {
