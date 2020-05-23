@@ -2,14 +2,15 @@ version: "3.3"
 
 services:
   rabbitmq:
-    image: rabbitmq
+    image: rabbitmq:management
     environment:
       - RABBITMQ_DEFAULT_USER=user
       - RABBITMQ_DEFAULT_PASS=passwd
+    ports:
+      - 15672:15672
+      - 5672:5672
   database:
     image: polyse/database
-    volumes:
-      - ./tmp/db:/var/data
     environment:
       - LOG_LEVEL=debug
     ports:
@@ -18,9 +19,10 @@ services:
     image: docker.pkg.github.com/polyse/web-scraper/listener
     restart: always
     environment:
-      - RABBITMQ_URI=amqp://rabbitmq:5672
+      - RABBITMQ_URI=amqp://user:passwd@rabbitmq:5672
       - SERVER=http://database:9000
       - LOG_LEVEL=debug
+      - NUM_DOC=20
     depends_on:
       - database
       - rabbitmq
@@ -28,9 +30,10 @@ services:
     image: docker.pkg.github.com/polyse/web-scraper/daemon
     restart: always
     environment:
-      - RABBITMQ_URI=amqp://rabbitmq:5672
+      - RABBITMQ_URI=amqp://user:passwd@rabbitmq:5672
       - LOG_LEVEL=debug
       - LISTEN=0.0.0.0:7171
+      - RATE_LIMIT=10
     ports:
       - 7171:7171
     depends_on:

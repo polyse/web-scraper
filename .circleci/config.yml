@@ -1,26 +1,33 @@
 version: 2.1
 commands:
-  docker-all:
+  build-image:
     description: "Build and publish docker image"
     parameters:
       mode:
         type: string
         default: daemon
-      base-image:
-        type: string
-        default: docker.pkg.github.com/polyse/web-scraper
     steps:
       - run:
           name: Build << parameters.mode >> Docker image
           command: |
-            docker build --build-arg MODE=<< parameters.mode >>  -t << parameters.base-image >>/<< parameters.mode >>:latest .
+            docker build --build-arg MODE=<< parameters.mode >>  -t docker.pkg.github.com/polyse/web-scraper/<< parameters.mode >>:$CIRCLE_SHA1 .
       - run:
-          name: Push << parameters.mode >> Docker Image
+          name: Push << parameters.mode >> Docker image
           command: |
             echo "$DOCKERHUB_PASS" | docker login docker.pkg.github.com --username "$DOCKERHUB_USERNAME" --password-stdin
-            docker tag << parameters.base-image >>/<< parameters.mode >>:latest << parameters.base-image >>/<< parameters.mode >>:$CIRCLE_SHA1
-            docker push << parameters.base-image >>/<< parameters.mode >>:latest
-            docker push << parameters.base-image >>/<< parameters.mode >>:$CIRCLE_SHA1
+            docker push docker.pkg.github.com/polyse/web-scraper/<< parameters.mode >>:$CIRCLE_SHA1
+  push-latest:
+    description: "Push latest"
+    parameters:
+      mode:
+        type: string
+        default: daemon
+    steps:
+      - run:
+          name: Push << parameters.mode >> Docker latest
+          command: |
+            docker tag docker.pkg.github.com/polyse/web-scraper/<< parameters.mode >>:$CIRCLE_SHA1 docker.pkg.github.com/polyse/web-scraper/<< parameters.mode >>:latest
+            docker push docker.pkg.github.com/polyse/web-scraper/<< parameters.mode >>:latest
 
 jobs:
   test:
@@ -40,8 +47,16 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker
-      - docker-all
-      - docker-all:
+      - build-image
+      - build-image:
+          mode: listener
+  build-latest:
+    docker:
+      - image: circleci/buildpack-deps:stretch
+    working_directory: ~/app
+    steps:
+      - push-latest
+      - push-latest:
           mode: listener
   deploy:
     docker:
@@ -56,26 +71,29 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Deploy
+          name: Deploy daemon
           command: COMMIT_SHA=$CIRCLE_SHA1 SERVICE=web-scraper-daemon /deploy/deploy.sh
+      - run:
+          name: Deploy listener
+          command: COMMIT_SHA=$CIRCLE_SHA1 SERVICE=web-scraper-listener /deploy/deploy.sh
 
 workflows:
   version: 2
   build-deploy-master:
     jobs:
-      - test:
-          filters:
-            branches:
-              ignore: master
+      - test
       - build:
-          filters:
-            branches:
-              only: master
-      #          requires:
-      #            - test
-      - deploy:
+          requires:
+            - test
+      - build-latest:
           filters:
             branches:
               only: master
           requires:
             - build
+      - deploy:
+          filters:
+            branches:
+              only: master
+          requires:
+            - build-latest
