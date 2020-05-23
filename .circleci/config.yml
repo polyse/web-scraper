@@ -61,6 +61,7 @@ jobs:
       - image: circleci/buildpack-deps:stretch
     working_directory: ~/app
     steps:
+      - checkout
       - setup_remote_docker
       - build-latest
       - build-latest:
