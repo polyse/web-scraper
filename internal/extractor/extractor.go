@@ -6,11 +6,14 @@ import (
 	"github.com/mauidude/go-readability"
 )
 
+var (
+	regexpOpenTag  = regexp.MustCompile(`(<[a-zA-Z0-9]+>)`)
+	regexpCloseTag = regexp.MustCompile(`(</[a-zA-Z0-9]+>)`)
+)
+
 // Clean removes html tags from string
 func Clean(contentWithTags string) string {
-	regexpOpenTag := regexp.MustCompile(`(<[a-zA-Z0-9]+>)`)
 	content := regexpOpenTag.ReplaceAllString(contentWithTags, "")
-	regexpCloseTag := regexp.MustCompile(`(</[a-zA-Z0-9]+>)`)
 	content = regexpCloseTag.ReplaceAllString(content, " ")
 	return content
 }

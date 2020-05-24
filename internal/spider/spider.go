@@ -8,43 +8,36 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
-
-	"github.com/gocolly/colly/v2"
-
-	"github.com/polyse/web-scraper/internal/locker"
-
-	"github.com/polyse/web-scraper/internal/rabbitmq"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/araddon/dateparse"
+	"github.com/gocolly/colly/v2"
+	"github.com/gocolly/colly/v2/extensions"
 	sdk "github.com/polyse/database-sdk"
+	"github.com/polyse/web-scraper/internal/extractor"
+	"github.com/polyse/web-scraper/internal/locker"
+	"github.com/polyse/web-scraper/internal/rabbitmq"
 	zl "github.com/rs/zerolog/log"
 	"go.uber.org/ratelimit"
-	"go.zoe.im/surferua"
-
-	"github.com/polyse/web-scraper/internal/extractor"
 )
 
 type Spider struct {
 	Queue              *rabbitmq.Queue
 	RateLimit          ratelimit.Limiter
 	Delay, RandomDelay time.Duration
-	userAgentMutex     *sync.RWMutex
 	dataCh             chan sdk.RawData
 	locker             *locker.Conn
 }
 
 func NewSpider(queue *rabbitmq.Queue, limit int, delay, randomDelay time.Duration, locker *locker.Conn) (*Spider, error) {
 	s := &Spider{
-		Queue:          queue,
-		RateLimit:      ratelimit.New(limit),
-		Delay:          delay,
-		RandomDelay:    randomDelay,
-		userAgentMutex: &sync.RWMutex{},
-		dataCh:         make(chan sdk.RawData),
-		locker:         locker,
+		Queue:       queue,
+		RateLimit:   ratelimit.New(limit),
+		Delay:       delay,
+		RandomDelay: randomDelay,
+		dataCh:      make(chan sdk.RawData),
+		locker:      locker,
 	}
 	go s.Listener()
 	return s, nil
@@ -58,23 +51,8 @@ func (s *Spider) Scrap(ctx context.Context, startUrl *url.URL) error {
 	if err := co.Visit(startUrl.String()); err != nil {
 		return err
 	}
-	subCtx, cancel := context.WithCancel(ctx)
-	go func() {
-		for {
-			select {
-			case <-subCtx.Done():
-				return
-			default:
-			}
-			<-time.After(5 * time.Second)
-			s.userAgentMutex.Lock()
-			co.UserAgent = surferua.New().String()
-			s.userAgentMutex.Unlock()
-		}
-	}()
 	go func() {
 		co.Wait()
-		cancel()
 		zl.Debug().Msgf("%s", co.String())
 		zl.Debug().Msgf("Finish %v", startUrl)
 	}()
@@ -84,9 +62,9 @@ func (s *Spider) Scrap(ctx context.Context, startUrl *url.URL) error {
 func (s *Spider) initScrapper(ctx context.Context, u *url.URL) (*colly.Collector, error) {
 	co := colly.NewCollector(
 		colly.Async(true),
-		colly.UserAgent(surferua.New().String()),
 		colly.AllowedDomains(u.Host),
 	)
+	extensions.RandomUserAgent(co)
 	err := co.Limit(&colly.LimitRule{
 		DomainGlob:  "*",
 		Parallelism: runtime.NumCPU(),
@@ -105,18 +83,18 @@ func (s *Spider) initScrapper(ctx context.Context, u *url.URL) (*colly.Collector
 
 		link := e.Attr("href")
 		fullLink := e.Request.AbsoluteURL(link)
-		zl.Debug().Msgf("Find URL : %v", fullLink)
 		// check if url is locked
 		err := lock(s.locker, fullLink)
+		if err == errUrlIsLocked {
+			return
+		}
 		if err != nil {
 			zl.Debug().Err(err).Str("URL", fullLink).Msg("Failed to lock url")
 			return
 		}
 		zl.Debug().Str("URL", fullLink).Msg("Url is locked")
 		s.RateLimit.Take()
-		s.userAgentMutex.RLock()
 		err = e.Request.Visit(fullLink)
-		s.userAgentMutex.RUnlock()
 		if err == colly.ErrAlreadyVisited || err == colly.ErrForbiddenDomain {
 			return
 		}
@@ -142,6 +120,9 @@ func (s *Spider) initScrapper(ctx context.Context, u *url.URL) (*colly.Collector
 
 		title := doc.Find("Title").Text()
 		title = strings.TrimSpace(title)
+		if title == "" {
+			return
+		}
 
 		actual, err := extractor.ExtractContentFromHTML(payload)
 		if err != nil {
@@ -173,7 +154,7 @@ func (s *Spider) searchDate(r *colly.Response, doc *goquery.Document) time.Time 
 	yearBefore := time.Now().Add(time.Hour * 24 * -365)
 	for _, meta := range doc.Find("meta").Nodes {
 		for _, attr := range meta.Attr {
-			if t, err := dateparse.ParseAny(attr.Val); err == nil && t.After(yearBefore) {
+			if t, err := dateparse.ParseAny(attr.Val); err == nil && t.After(yearBefore) && t.Before(time.Now()) {
 				return t
 			}
 		}
@@ -195,12 +176,11 @@ func (s *Spider) searchDate(r *colly.Response, doc *goquery.Document) time.Time 
 
 func (s *Spider) Listener() {
 	for info := range s.dataCh {
-		if err := s.Queue.Produce(&info); err != nil {
-			zl.Error().Err(fmt.Errorf("can't produce message for '%s': %s", info.Url, err))
-		}
 		logger := zl.With().Str("Title", info.Source.Title).Str("URL", info.Url).Time("Date", info.Source.Date).Logger()
+		if err := s.Queue.Produce(&info); err != nil {
+			logger.Error().Msg("can't produce message")
+		}
 		logger.Info().Msgf("Document sent")
-		logger.Debug().Str("Content", info.Data).Msg("Document content sent")
 
 	}
 }
@@ -209,6 +189,10 @@ func (s *Spider) Close() {
 	close(s.dataCh)
 }
 
+var (
+	errUrlIsLocked = errors.New("url is locked")
+)
+
 // Try to lock url
 func lock(l *locker.Conn, url string) error {
 	locked, err := l.TryLock(url)
@@ -216,7 +200,7 @@ func lock(l *locker.Conn, url string) error {
 		return fmt.Errorf("failed to lock url: %w", err)
 	}
 	if !locked {
-		return errors.New("url is locked")
+		return errUrlIsLocked
 	}
 	return nil
 }

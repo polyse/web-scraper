@@ -18,7 +18,6 @@ require (
 	github.com/xlab/closer v0.0.0-20190328110542-03326addb7c2
 	go.uber.org/atomic v1.6.0 // indirect
 	go.uber.org/ratelimit v0.1.0
-	go.zoe.im/surferua v0.0.1
 	golang.org/x/net v0.0.0-20200506145744-7e3656a0809f // indirect
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 )
