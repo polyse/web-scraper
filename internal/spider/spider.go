@@ -152,7 +152,20 @@ func (s *Spider) initScrapper(ctx context.Context, u *url.URL) (*colly.Collector
 
 func (s *Spider) searchDate(r *colly.Response, doc *goquery.Document) time.Time {
 	yearBefore := time.Now().Add(time.Hour * 24 * -365)
+	//TODO: rewrite the hack below
 	for _, meta := range doc.Find("meta").Nodes {
+		for _, attr := range meta.Attr {
+			if strings.Contains(attr.Val, "published_time") {
+				for _, dateAttr := range meta.Attr {
+					if dateAttr.Key == "content" {
+						if t, err := dateparse.ParseAny(dateAttr.Val); err == nil && t.After(yearBefore) && t.Before(time.Now()) {
+							return t
+						}
+					}
+				}
+			}
+		}
+
 		for _, attr := range meta.Attr {
 			if t, err := dateparse.ParseAny(attr.Val); err == nil && t.After(yearBefore) && t.Before(time.Now()) {
 				return t
