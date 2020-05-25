@@ -110,6 +110,7 @@ func (c *Consumer) listener(dataCh <-chan amqp.Delivery) {
 			messages.Documents = append(messages.Documents, message)
 			deliveries = append(deliveries, d)
 			if c.numDoc == count {
+				zl.Info().Msgf("flush %d docs", c.numDoc)
 				c.saveMessages(messages, deliveries)
 				count = 0
 				messages = sdk.Documents{}
@@ -117,6 +118,10 @@ func (c *Consumer) listener(dataCh <-chan amqp.Delivery) {
 			}
 		case <-time.After(c.timeout):
 			zl.Debug().Msg("Timeout end")
+			if c.numDoc == 0 {
+				continue
+			}
+			zl.Info().Msgf("flush %d docs", c.numDoc)
 			c.saveMessages(messages, deliveries)
 			count = 0
 			messages = sdk.Documents{}
