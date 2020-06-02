@@ -133,6 +133,9 @@ func (s *Spider) initScrapper(ctx context.Context, u *url.URL) (*colly.Collector
 		content := extractor.Clean(actual)
 
 		t := s.searchDate(r, doc)
+		if t.IsZero() {
+			return
+		}
 
 		s.dataCh <- sdk.RawData{
 			Source: sdk.Source{
@@ -184,7 +187,7 @@ func (s *Spider) searchDate(r *colly.Response, doc *goquery.Document) time.Time 
 			return tt
 		}
 	}
-	return time.Now()
+	return time.Time{}
 }
 
 func (s *Spider) Listener() {

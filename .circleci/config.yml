@@ -102,9 +102,9 @@ workflows:
               only: master
           requires:
             - test
-      - deploy:
-          filters:
-            branches:
-              only: master
-          requires:
-            - build-latest
+#      - deploy:
+#          filters:
+#            branches:
+#              only: master
+#          requires:
+#            - build-latest
